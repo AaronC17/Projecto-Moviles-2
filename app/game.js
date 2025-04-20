@@ -29,7 +29,7 @@ export default function GameScreen() {
     const [mensajes, setMensajes] = useState([]);
     const [contador, setContador] = useState(60);
     const [jugadoresConectados, setJugadoresConectados] = useState(1);
-    const [esperando, setEsperando] = useState(modo === "multijugador");
+    const [esperando, setEsperando] = useState(modo === "multijugador2");
 
     const [dropAreas, setDropAreas] = useState({ izquierdo: null, derecho: null });
     const refIzq = useRef(null);
