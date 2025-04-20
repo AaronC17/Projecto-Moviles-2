@@ -11,13 +11,30 @@ import {
 export default function ResultScreen() {
     const { resumen, nombre } = useLocalSearchParams();
     const router = useRouter();
-    const resumenData = JSON.parse(decodeURIComponent(resumen));
+
+    const [resumenData, setResumenData] = useState(null);
+    const [adivinanzas, setAdivinanzas] = useState({});
+    const [resultadoAciertos, setResultadoAciertos] = useState(null);
+
+    useEffect(() => {
+        try {
+            const parsed = JSON.parse(decodeURIComponent(resumen));
+            setResumenData(parsed);
+        } catch (err) {
+            console.error("❌ Error al decodificar resumen:", err);
+        }
+    }, [resumen]);
+
+    if (!resumenData) {
+        return (
+            <View style={styles.loadingContainer}>
+                <Text style={styles.titulo}>Cargando resumen...</Text>
+            </View>
+        );
+    }
 
     const esSobreviviente = resumenData.sobrevivientes.includes(nombre);
     const misBloques = resumenData.bloquesPorJugador[nombre] || [];
-
-    const [adivinanzas, setAdivinanzas] = useState({});
-    const [resultadoAciertos, setResultadoAciertos] = useState(null);
 
     const enviarAdivinanza = async () => {
         let aciertos = 0;
@@ -119,6 +136,7 @@ export default function ResultScreen() {
 }
 
 const styles = StyleSheet.create({
+    loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
     titulo: { fontSize: 22, fontWeight: "bold", marginBottom: 20 },
     subtitulo: { fontSize: 18, fontWeight: "bold", marginTop: 20, marginBottom: 10 },
     aciertos: { marginTop: 20, fontSize: 18, fontWeight: "bold", color: "green" },
