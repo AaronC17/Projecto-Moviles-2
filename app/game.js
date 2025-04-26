@@ -274,7 +274,7 @@ export default function GameScreen() {
   return (
     <View style={{ flex: 1, padding: 20 }}>
       {pista && (
-        <Text style={styles.pista}>🎯 Pista: Tu cubo {pista.color} pesa {pista.peso}g</Text>
+        <Text style={styles.pista}> Pista: Tu cubo {pista.color} pesa {pista.peso}g</Text>
       )}
       <Text style={styles.titulo}>Jugador: {nombre}</Text>
       <Text style={styles.subtitulo}>Turno de: {jugadorEnTurno || "..."}</Text>
