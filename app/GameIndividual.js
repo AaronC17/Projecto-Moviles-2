@@ -1,3 +1,4 @@
+// app/GameIndividual.js
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -10,7 +11,6 @@ import {
     Button,
     Alert,
 } from 'react-native';
-import { getSocket } from '../sockets/connection';
 import BalanzaAnimada from '../components/BalanzaAnimada';
 
 const COLORES = ['red', 'blue', 'green', 'orange', 'purple'];
@@ -35,18 +35,17 @@ export default function GameIndividual() {
     useEffect(() => {
         const nuevos = [];
         COLORES.forEach(color => {
-            // 🔥 Cada color tiene dos bloques, uno con número 1 y otro con número 2
             nuevos.push({
                 id: `${color}-1-${Math.random().toString(36).substring(2, 7)}`,
                 color,
-                peso: Math.floor(Math.random() * 19) + 2,
+                peso: (Math.floor(Math.random() * 10) + 1) * 2,
                 pan: new Animated.ValueXY(),
                 numero: 1,
             });
             nuevos.push({
                 id: `${color}-2-${Math.random().toString(36).substring(2, 7)}`,
                 color,
-                peso: Math.floor(Math.random() * 19) + 2,
+                peso: (Math.floor(Math.random() * 10) + 1) * 2,
                 pan: new Animated.ValueXY(),
                 numero: 2,
             });
@@ -164,7 +163,9 @@ export default function GameIndividual() {
                     { transform: bloque.pan.getTranslateTransform() },
                 ]}
             >
-                <Text style={styles.numero}>{bloque.numero}</Text>
+                <Text style={styles.numero} selectable={false}>
+                    {bloque.numero}
+                </Text>
             </Animated.View>
         );
     };

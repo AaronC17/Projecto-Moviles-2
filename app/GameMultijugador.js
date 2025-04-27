@@ -45,14 +45,14 @@ export default function GameMultijugador() {
             nuevos.push({
                 id: `${color}-1-${Math.random().toString(36).substring(2, 7)}`,
                 color,
-                peso: Math.floor(Math.random() * 19) + 2,
+                peso: (Math.floor(Math.random() * 10) + 1) * 2, // 🔥 SOLO PARES
                 pan: new Animated.ValueXY(),
                 numero: 1,
             });
             nuevos.push({
                 id: `${color}-2-${Math.random().toString(36).substring(2, 7)}`,
                 color,
-                peso: Math.floor(Math.random() * 19) + 2,
+                peso: (Math.floor(Math.random() * 10) + 1) * 2, // 🔥 SOLO PARES
                 pan: new Animated.ValueXY(),
                 numero: 2,
             });
@@ -233,7 +233,9 @@ export default function GameMultijugador() {
                     { transform: bloque.pan.getTranslateTransform() },
                 ]}
             >
-                <Text style={styles.numero}>{bloque.numero}</Text>
+                <Text style={styles.numero} selectable={false}>
+                    {bloque.numero}
+                </Text>
             </Animated.View>
         );
     };
@@ -250,12 +252,8 @@ export default function GameMultijugador() {
 
     return (
         <ScrollView contentContainerStyle={styles.container}>
-            <Text style={styles.titulo} selectable={false}>
-                Jugador: {nombre}
-            </Text>
-            <Text style={styles.subtitulo} selectable={false}>
-                Turno de: {jugadorEnTurno}
-            </Text>
+            <Text style={styles.titulo} selectable={false}>Jugador: {nombre}</Text>
+            <Text style={styles.subtitulo} selectable={false}>Turno de: {jugadorEnTurno}</Text>
             {miTurno && (
                 <Text style={styles.contador} selectable={false}>
                     ⏱️ {Math.floor(contador / 60)}:{String(contador % 60).padStart(2, '0')}

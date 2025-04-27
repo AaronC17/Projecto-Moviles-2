@@ -9,6 +9,17 @@ import {
     ActivityIndicator,
 } from "react-native";
 
+const traducirColor = (colorIngles) => {
+    const traducciones = {
+        red: "rojo",
+        blue: "azul",
+        green: "verde",
+        orange: "naranja",
+        purple: "morado",
+    };
+    return traducciones[colorIngles] || colorIngles;
+};
+
 export default function ResultScreen() {
     const { resumen, nombre } = useLocalSearchParams();
     const router = useRouter();
@@ -34,7 +45,7 @@ export default function ResultScreen() {
         });
 
         try {
-            await fetch("http://192.168.0.2:5000/adivinanzas", {
+            await fetch("http://192.168.100.101:5000/adivinanzas", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -86,10 +97,10 @@ export default function ResultScreen() {
                     <Text style={styles.subtitulo}>🎯 Adivina el peso de tus bloques</Text>
                     {misBloques.map((bloque, i) => (
                         <View key={i} style={styles.bloqueBox}>
-                            <Text>Bloque {i + 1} (color {bloque.color}):</Text>
+                            <Text>Bloque {i + 1} (color {traducirColor(bloque.color)}):</Text>
                             <ScrollView horizontal>
-                                {[...Array(19)].map((_, n) => {
-                                    const valor = n + 2;
+                                {[...Array(10)].map((_, n) => {
+                                    const valor = (n + 1) * 2; // 🔥 SOLO PARES: 2,4,6,...20
                                     return (
                                         <TouchableOpacity
                                             key={valor}
