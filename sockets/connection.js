@@ -4,7 +4,7 @@ let socket = null;
 
 export function getSocket() {
     if (!socket || socket.readyState === WebSocket.CLOSED) {
-        socket = new WebSocket('ws://192.168.0.2:5000'); // tu IP local
+        socket = new WebSocket('ws://127.0.0.1:5000');
     }
     return socket;
 }

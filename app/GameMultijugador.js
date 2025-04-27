@@ -89,16 +89,16 @@ export default function GameMultijugador() {
             if (data.type === 'ACTUALIZAR_BALANZA') {
                 setPesoIzq1(data.izquierdo || 0);
                 setPesoDer1(data.derecho || 0);
-            
+
                 if (data.bloque) {
                     const nuevoBloque = {
                         id: `${data.bloque.color}-${Date.now()}`,
                         color: data.bloque.color,
                         peso: data.bloque.peso,
                         pan: new Animated.ValueXY(),
-                        numero: 0, // Opcional, no importa para bloques colocados
+                        numero: 0,
                     };
-            
+
                     if (data.bloque.lado === 'izquierdo') {
                         setBloquesIzq1(prev => [...prev, nuevoBloque]);
                     } else {
@@ -106,7 +106,6 @@ export default function GameMultijugador() {
                     }
                 }
             }
-            
             if (data.type === 'MENSAJE' && data.contenido.includes('fue eliminado')) {
                 const nombreEliminado = data.contenido.split(' ')[0];
                 setJugadoresEliminados(prev => [...prev, nombreEliminado]);
@@ -228,8 +227,14 @@ export default function GameMultijugador() {
             <Animated.View
                 key={bloque.id}
                 {...panResponder.panHandlers}
-                style={[styles.bloque, { backgroundColor: bloque.color }, { transform: bloque.pan.getTranslateTransform() }]}
-            />
+                style={[
+                    styles.bloque,
+                    { backgroundColor: bloque.color },
+                    { transform: bloque.pan.getTranslateTransform() },
+                ]}
+            >
+                <Text style={styles.numero}>{bloque.numero}</Text>
+            </Animated.View>
         );
     };
 
@@ -288,6 +293,7 @@ const styles = StyleSheet.create({
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     section: { fontSize: 16, fontWeight: 'bold', marginTop: 20 },
     bloquesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 20 },
-    bloque: { width: 60, height: 60, borderRadius: 8, margin: 8 },
+    bloque: { width: 60, height: 60, borderRadius: 8, margin: 8, justifyContent: 'center', alignItems: 'center' },
     ra: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
+    numero: { fontSize: 24, fontWeight: 'bold', color: 'black', textAlign: 'center' },
 });
