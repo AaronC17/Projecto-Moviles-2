@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
     View,
     Text,
@@ -14,7 +14,7 @@ const traducirColor = (colorIngles) => {
         red: "rojo",
         blue: "azul",
         green: "verde",
-        orange: "naranja",
+        orange: "amarillo", // 🔥 Cambiado a amarillo
         purple: "morado",
     };
     return traducciones[colorIngles] || colorIngles;
@@ -32,12 +32,21 @@ export default function ResultScreen() {
     const [resultadoAciertos, setResultadoAciertos] = useState(null);
     const [enviando, setEnviando] = useState(false);
 
+    const bloquesUnicos = [];
+    const coloresVistos = new Set();
+    misBloques.forEach((bloque) => {
+        if (!coloresVistos.has(bloque.color)) {
+            coloresVistos.add(bloque.color);
+            bloquesUnicos.push(bloque);
+        }
+    });
+
     const enviarAdivinanza = async () => {
         setEnviando(true);
         let aciertos = 0;
         const detalle = [];
 
-        misBloques.forEach((bloque, i) => {
+        bloquesUnicos.forEach((bloque, i) => {
             const intento = parseInt(adivinanzas[i]);
             const acertado = intento === bloque.peso;
             if (acertado) aciertos++;
@@ -88,40 +97,54 @@ export default function ResultScreen() {
             <Text style={styles.subtitulo}>📜 Jugadas:</Text>
             <View style={styles.jugadasBox}>
                 {resumenData.contenido.length > 0 ? resumenData.contenido.map((j, i) => (
-                    <Text key={i}>• Turno {j.turno}: {j.jugador} colocó {j.peso}g</Text>
+                    <Text key={i}>• Turno {j.turno}: {j.jugador} colocó {j.peso}g ({traducirColor(j.color)})</Text>
                 )) : <Text style={{ fontStyle: 'italic' }}>No hubo jugadas registradas.</Text>}
             </View>
 
             {esSobreviviente && resultadoAciertos === null && (
                 <View style={{ marginTop: 30 }}>
                     <Text style={styles.subtitulo}>🎯 Adivina el peso de tus bloques</Text>
-                    {misBloques.map((bloque, i) => (
-                        <View key={i} style={styles.bloqueBox}>
-                            <Text>Bloque {i + 1} (color {traducirColor(bloque.color)}):</Text>
-                            <ScrollView horizontal>
-                                {[...Array(10)].map((_, n) => {
-                                    const valor = (n + 1) * 2; // 🔥 SOLO PARES: 2,4,6,...20
-                                    return (
-                                        <TouchableOpacity
-                                            key={valor}
-                                            onPress={() =>
-                                                setAdivinanzas((prev) => ({
-                                                    ...prev,
-                                                    [i]: valor,
-                                                }))
-                                            }
-                                            style={[
-                                                styles.valorBtn,
-                                                adivinanzas[i] === valor && styles.valorActivo,
-                                            ]}
-                                        >
-                                            <Text>{valor}</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </ScrollView>
-                        </View>
-                    ))}
+                    {bloquesUnicos.map((bloque, i) => {
+                        const colorPastel = {
+                            red: '#f9a3a3',     // 🔥 Rojo pastel corregido
+                            blue: '#a3d8f4',
+                            green: '#b8e994',
+                            orange: '#fff7ae',  // 🔥 Amarillo pastel
+                            purple: '#d7bce8',
+                        }[bloque.color] || '#eee';
+
+                        return (
+                            <View key={i} style={styles.bloqueBox}>
+                                <Text>Bloque {i + 1} (color {traducirColor(bloque.color)}):</Text>
+                                <ScrollView horizontal>
+                                    {[...Array(10)].map((_, n) => {
+                                        const valor = (n + 1) * 2;
+                                        const seleccionado = adivinanzas[i] === valor;
+                                        return (
+                                            <TouchableOpacity
+                                                key={valor}
+                                                onPress={() =>
+                                                    setAdivinanzas((prev) => ({
+                                                        ...prev,
+                                                        [i]: valor,
+                                                    }))
+                                                }
+                                                style={[
+                                                    styles.valorBtn,
+                                                    { backgroundColor: colorPastel },
+                                                    seleccionado && styles.valorActivo,
+                                                ]}
+                                            >
+                                                <Text style={seleccionado ? styles.valorBtnTextoActivo : {}}>
+                                                    {valor}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </View>
+                        );
+                    })}
 
                     <TouchableOpacity
                         style={styles.boton}
@@ -136,7 +159,7 @@ export default function ResultScreen() {
 
             {resultadoAciertos !== null && (
                 <View style={{ alignItems: 'center', marginTop: 30 }}>
-                    <Text style={styles.aciertos}>🎉 ¡Adivinaste correctamente {resultadoAciertos} de {misBloques.length} bloques!</Text>
+                    <Text style={styles.aciertos}>🎉 ¡Adivinaste correctamente {resultadoAciertos} de {bloquesUnicos.length} bloques!</Text>
                     <Text style={styles.frase}>{fraseAleatoria()}</Text>
                 </View>
             )}
@@ -185,14 +208,20 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     valorBtn: {
-        padding: 8,
-        margin: 2,
+        padding: 10,
+        margin: 3,
         borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 4,
-        backgroundColor: '#eee',
+        borderColor: '#bbb',
+        borderRadius: 6,
+        minWidth: 40,
+        alignItems: 'center',
     },
     valorActivo: {
-        backgroundColor: '#add8e6',
+        backgroundColor: '#2c3e50', // 🔥 Azul oscuro
+        borderColor: '#00307a',
+    },
+    valorBtnTextoActivo: {
+        color: 'white',
+        fontWeight: 'bold',
     },
 });

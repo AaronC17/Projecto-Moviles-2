@@ -10,11 +10,13 @@ import {
     PanResponder,
     Button,
     Alert,
+    Modal,
 } from 'react-native';
 import { getSocket } from '../sockets/connection';
 import BalanzaAnimada from '../components/BalanzaAnimada';
 
 const COLORES = ['red', 'blue', 'green', 'orange', 'purple'];
+const COLORES_ES = { red: 'rojo', blue: 'azul', green: 'verde', orange: 'amarillo', purple: 'púrpura' };
 
 export default function GameMultijugador() {
     const { nombre } = useLocalSearchParams();
@@ -37,28 +39,54 @@ export default function GameMultijugador() {
     const [contador, setContador] = useState(300);
     const [jugadoresConectados, setJugadoresConectados] = useState(0);
     const [jugadoresEliminados, setJugadoresEliminados] = useState([]);
+    const [pista, setPista] = useState('');
+    const [mostrarPista, setMostrarPista] = useState(false);
     const intervaloRef = useRef(null);
 
     useEffect(() => {
         const nuevos = [];
+        const pesos = [];
+
         COLORES.forEach(color => {
+            const pesoComun = (Math.floor(Math.random() * 10) + 1) * 2;
+            pesos.push({ color, peso: pesoComun });
             nuevos.push({
-                id: `${color}-1-${Math.random().toString(36).substring(2, 7)}`,
+                id: `${color}-${Math.random().toString(36).substring(2, 7)}`,
                 color,
-                peso: (Math.floor(Math.random() * 10) + 1) * 2, // 🔥 SOLO PARES
+                peso: pesoComun,
                 pan: new Animated.ValueXY(),
-                numero: 1,
             });
             nuevos.push({
-                id: `${color}-2-${Math.random().toString(36).substring(2, 7)}`,
+                id: `${color}-${Math.random().toString(36).substring(2, 7)}`,
                 color,
-                peso: (Math.floor(Math.random() * 10) + 1) * 2, // 🔥 SOLO PARES
+                peso: pesoComun,
                 pan: new Animated.ValueXY(),
-                numero: 2,
             });
         });
+
         setBloques(nuevos);
+
+        // Calcular pista
+        pesos.sort((a, b) => b.peso - a.peso);
+        const random = pesos[Math.floor(Math.random() * pesos.length)];
+        const posicion = pesos.findIndex(p => p.color === random.color) + 1;
+        const ordinal = getOrdinal(posicion);
+        setPista(`El bloque ${COLORES_ES[random.color]} es el ${ordinal} más pesado y pesa ${random.peso} gramos.`);
+        setMostrarPista(true);
+
+        setTimeout(() => setMostrarPista(false), 5000);
     }, []);
+
+    const getOrdinal = (n) => {
+        switch (n) {
+            case 1: return 'primer';
+            case 2: return 'segundo';
+            case 3: return 'tercer';
+            case 4: return 'cuarto';
+            case 5: return 'quinto';
+            default: return `${n}º`;
+        }
+    };
 
     useEffect(() => {
         if (!socket) return;
@@ -96,7 +124,6 @@ export default function GameMultijugador() {
                         color: data.bloque.color,
                         peso: data.bloque.peso,
                         pan: new Animated.ValueXY(),
-                        numero: 0,
                     };
 
                     if (data.bloque.lado === 'izquierdo') {
@@ -123,10 +150,10 @@ export default function GameMultijugador() {
         };
 
         if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: 'ENTRADA', jugador: nombre, modo: 'multijugador' }));
+            socket.send(JSON.stringify({ type: "ENTRADA", jugador: nombre, modo: "multijugador" }));
         } else {
             socket.onopen = () => {
-                socket.send(JSON.stringify({ type: 'ENTRADA', jugador: nombre, modo: 'multijugador' }));
+                socket.send(JSON.stringify({ type: "ENTRADA", jugador: nombre, modo: "multijugador" }));
             };
         }
 
@@ -144,7 +171,6 @@ export default function GameMultijugador() {
                 lado,
             }));
         }
-
         setBloques(prev => prev.filter(b => b.id !== bloque.id));
         setMiTurno(false);
         clearInterval(intervaloRef.current);
@@ -195,16 +221,14 @@ export default function GameMultijugador() {
             onStartShouldSetPanResponder: () => miTurno,
             onPanResponderGrant: () => bloque.pan.extractOffset(),
             onPanResponderMove: Animated.event([null, { dx: bloque.pan.x, dy: bloque.pan.y }], { useNativeDriver: false }),
-            onPanResponderRelease: (e, gesture) => {
+            onPanResponderRelease: (_, gesture) => {
                 bloque.pan.flattenOffset();
-
                 const dropOrder = [
                     { area: dropAreas1.izquierdo, action: () => enviarJugada(bloque, 'izquierdo', 1) },
                     { area: dropAreas1.derecho, action: () => enviarJugada(bloque, 'derecho', 1) },
                     { area: dropAreas2.izquierdo, action: () => colocarPrueba(bloque, 'izquierdo') },
                     { area: dropAreas2.derecho, action: () => colocarPrueba(bloque, 'derecho') },
                 ];
-
                 let colocado = false;
                 for (const { area, action } of dropOrder) {
                     if (isInDropArea(gesture, area)) {
@@ -213,7 +237,6 @@ export default function GameMultijugador() {
                         break;
                     }
                 }
-
                 if (!colocado) {
                     Animated.spring(bloque.pan, {
                         toValue: { x: 0, y: 0 },
@@ -232,38 +255,41 @@ export default function GameMultijugador() {
                     { backgroundColor: bloque.color },
                     { transform: bloque.pan.getTranslateTransform() },
                 ]}
-            >
-                <Text style={styles.numero} selectable={false}>
-                    {bloque.numero}
-                </Text>
-            </Animated.View>
+            />
         );
     };
 
     if (jugadoresConectados < 2) {
         return (
             <View style={styles.centered}>
-                <Text style={styles.esperando} selectable={false}>
-                    Esperando jugadores... ({jugadoresConectados}/2)
-                </Text>
+                <Text style={styles.esperando}>Esperando jugadores... ({jugadoresConectados}/2)</Text>
             </View>
         );
     }
 
     return (
         <ScrollView contentContainerStyle={styles.container}>
-            <Text style={styles.titulo} selectable={false}>Jugador: {nombre}</Text>
-            <Text style={styles.subtitulo} selectable={false}>Turno de: {jugadorEnTurno}</Text>
+            <Modal visible={mostrarPista} transparent animationType="fade">
+                <View style={styles.modalBackground}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.pistaTexto}>{pista}</Text>
+                    </View>
+                </View>
+            </Modal>
+
+            <Text style={styles.titulo}>Jugador: {nombre}</Text>
+            <Text style={styles.subtitulo}>Turno de: {jugadorEnTurno}</Text>
+
             {miTurno && (
-                <Text style={styles.contador} selectable={false}>
+                <Text style={styles.contador}>
                     ⏱️ {Math.floor(contador / 60)}:{String(contador % 60).padStart(2, '0')}
                 </Text>
             )}
 
-            <Text style={styles.section} selectable={false}>Balanza 1 (finaliza turno):</Text>
+            <Text style={styles.section}>Balanza 1 (finaliza turno):</Text>
             <BalanzaAnimada pesoIzq={pesoIzq1} pesoDer={pesoDer1} bloquesIzq={bloquesIzq1} bloquesDer={bloquesDer1} setDropAreas={setDropAreas1} allowRemove={false} />
 
-            <Text style={styles.section} selectable={false}>Balanza 2 (prueba libre):</Text>
+            <Text style={styles.section}>Balanza 2 (prueba libre):</Text>
             <BalanzaAnimada pesoIzq={pesoIzq2} pesoDer={pesoDer2} bloquesIzq={bloquesIzq2} bloquesDer={bloquesDer2} setDropAreas={setDropAreas2} allowRemove={true} />
 
             <View style={styles.ra}>
@@ -291,7 +317,9 @@ const styles = StyleSheet.create({
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     section: { fontSize: 16, fontWeight: 'bold', marginTop: 20 },
     bloquesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 20 },
-    bloque: { width: 60, height: 60, borderRadius: 8, margin: 8, justifyContent: 'center', alignItems: 'center' },
+    bloque: { width: 60, height: 60, borderRadius: 8, margin: 8 },
     ra: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
-    numero: { fontSize: 24, fontWeight: 'bold', color: 'black', textAlign: 'center' },
+    modalBackground: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+    modalContainer: { backgroundColor: 'white', padding: 20, borderRadius: 10, alignItems: 'center' },
+    pistaTexto: { fontSize: 18, fontWeight: 'bold', color: '#333', textAlign: 'center' },
 });

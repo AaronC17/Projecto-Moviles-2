@@ -51,7 +51,7 @@ wss.on("connection", (ws) => {
                         const bloques = [];
                         COLORES.forEach((color) => {
                             for (let i = 0; i < 2; i++) {
-                                bloques.push({ color, peso: Math.floor(Math.random() * 19) + 2 });
+                                bloques.push({ color, peso: Math.floor(Math.random() * 10 + 1) * 2 }); // Peso PAR
                             }
                         });
                         sesionesIndividuales[ws.nombre] = {
@@ -83,7 +83,7 @@ wss.on("connection", (ws) => {
                         const bloques = [];
                         COLORES.forEach(color => {
                             for (let i = 0; i < 2; i++) {
-                                bloques.push({ color, peso: Math.floor(Math.random() * 19) + 2 });
+                                bloques.push({ color, peso: Math.floor(Math.random() * 10 + 1) * 2 }); // Peso PAR
                                 bloquesTotales++;
                             }
                         });
@@ -93,6 +93,10 @@ wss.on("connection", (ws) => {
                     broadcast({ type: "ENTRADA", totalJugadores: jugadores.length });
 
                     if (jugadores.length >= 2) {
+                        const pista = generarPista();
+                        if (pista) {
+                            broadcast({ type: "PISTA", contenido: pista });
+                        }
                         enviarTurno();
                     }
                 }
@@ -112,15 +116,16 @@ wss.on("connection", (ws) => {
 
     ws.on("close", () => {
         jugadores = jugadores.filter(j => j !== ws);
-    
+
         broadcast({ type: "ENTRADA", totalJugadores: jugadores.length });
-    
+
         if (turnoActual >= jugadores.length) turnoActual = 0;
         enviarTurno();
     });
 });
 
 // ----------------- Funciones -----------------
+
 function procesarJugadaIndividual(ws, msg) {
     const sesion = sesionesIndividuales[ws.nombre];
     if (!sesion || sesion.terminado) return;
@@ -171,7 +176,7 @@ async function procesarJugadaMultijugador(ws, msg) {
 
     const diferencia = Math.abs(pesoIzquierdo - pesoDerecho);
 
-    if (diferencia > 15) {
+    if (diferencia > 20) {
         ws.eliminado = true;
 
         broadcast({
@@ -191,7 +196,6 @@ async function procesarJugadaMultijugador(ws, msg) {
             },
         });
 
-        // 🔥🔥🔥 🔥 Aquí la corrección importante 🔥🔥🔥 🔥
         const jugadoresActivos = jugadores.filter(j => !j.eliminado);
         if (jugadoresActivos.length === 1) {
             enviarResumenFinal();
@@ -202,7 +206,6 @@ async function procesarJugadaMultijugador(ws, msg) {
         return;
     }
 
-    // 👇 SOLO SI NO hubo desequilibrio
     jugadasMultijugador.push({
         turno: totalJugadas + 1,
         jugador: msg.jugador,
@@ -235,8 +238,6 @@ async function procesarJugadaMultijugador(ws, msg) {
         avanzarTurno();
     }
 }
-
-
 
 function avanzarTurno() {
     if (jugadores.length === 0) return;
@@ -314,6 +315,35 @@ function enviarResumenFinal() {
     bloquesTotales = 0;
     bloquesPorJugador = {};
     jugadasMultijugador = [];
+}
+
+function generarPista() {
+    const todosLosBloques = [];
+
+    Object.keys(bloquesPorJugador).forEach(nombre => {
+        todosLosBloques.push(...bloquesPorJugador[nombre]);
+    });
+
+    if (todosLosBloques.length === 0) return null;
+
+    const bloquesOrdenados = [...todosLosBloques].sort((a, b) => a.peso - b.peso);
+    const indice = Math.floor(Math.random() * Math.min(5, bloquesOrdenados.length));
+    const bloquePista = bloquesOrdenados[indice];
+
+    const posiciones = ["el más liviano", "el segundo más liviano", "el tercer más liviano", "el cuarto más liviano", "el quinto más liviano"];
+
+    return `🔎 Pista: El bloque ${traducirColor(bloquePista.color)} es ${posiciones[indice]} y pesa ${bloquePista.peso} gramos.`;
+}
+
+function traducirColor(colorIngles) {
+    const traducciones = {
+        red: "rojo",
+        blue: "azul",
+        green: "verde",
+        orange: "naranja",
+        purple: "morado",
+    };
+    return traducciones[colorIngles] || colorIngles;
 }
 
 // ----------------- Server Start -----------------
