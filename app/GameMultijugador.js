@@ -15,7 +15,6 @@ import { getSocket } from '../sockets/connection';
 import BalanzaAnimada from '../components/BalanzaAnimada';
 
 const COLORES = ['red', 'blue', 'green', 'orange', 'purple'];
-const COLORES_ES = { red: 'rojo', blue: 'azul', green: 'verde', orange: 'amarillo', purple: 'púrpura' };
 
 export default function GameMultijugador() {
     const { nombre } = useLocalSearchParams();
@@ -45,11 +44,9 @@ export default function GameMultijugador() {
 
     useEffect(() => {
         const nuevos = [];
-        const pesos = [];
 
         COLORES.forEach(color => {
             const pesoComun = (Math.floor(Math.random() * 10) + 1) * 2;
-            pesos.push({ color, peso: pesoComun });
             nuevos.push({
                 id: `${color}-${Math.random().toString(36).substring(2, 7)}`,
                 color,
@@ -65,28 +62,7 @@ export default function GameMultijugador() {
         });
 
         setBloques(nuevos);
-
-        // Calcular pista
-        pesos.sort((a, b) => b.peso - a.peso);
-        const random = pesos[Math.floor(Math.random() * pesos.length)];
-        const posicion = pesos.findIndex(p => p.color === random.color) + 1;
-        const ordinal = getOrdinal(posicion);
-        setPista(`El bloque ${COLORES_ES[random.color]} es el ${ordinal} más pesado y pesa ${random.peso} gramos.`);
-        setMostrarPista(true);
-
-        setTimeout(() => setMostrarPista(false), 5000);
     }, []);
-
-    const getOrdinal = (n) => {
-        switch (n) {
-            case 1: return 'primer';
-            case 2: return 'segundo';
-            case 3: return 'tercer';
-            case 4: return 'cuarto';
-            case 5: return 'quinto';
-            default: return `${n}º`;
-        }
-    };
 
     useEffect(() => {
         if (!socket) return;
@@ -152,10 +128,14 @@ export default function GameMultijugador() {
                 Alert.alert(
                     "¡Equipo asignado!",
                     `Tu compañero es: ${data.compañero}`,
-                    [{ text: "OK", onPress: () => setMostrarPista(true) }]
+                    [{ text: "OK" }]
                 );
             }
-
+            if (data.type === 'PISTA') {
+                setPista(data.contenido);
+                setMostrarPista(true);
+                setTimeout(() => setMostrarPista(false), 5000);
+            }
         };
 
         if (socket.readyState === WebSocket.OPEN) {
@@ -204,7 +184,7 @@ export default function GameMultijugador() {
             setPesoIzq2(p => p - bloque.peso);
         } else if (lado === 'derecho' && bloquesDer2.length) {
             bloque = bloquesDer2[bloquesDer2.length - 1];
-            setPesoDer2(prev => prev.slice(0, -1));
+            setBloquesDer2(prev => prev.slice(0, -1));
             setPesoDer2(p => p - bloque.peso);
         } else {
             Alert.alert("Nada que quitar en ese lado");

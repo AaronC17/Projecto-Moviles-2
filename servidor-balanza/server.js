@@ -95,13 +95,13 @@ wss.on("connection", (ws) => {
 
                     if (jugadores.length === 10) {
                         generarEquipos();
-
                         const pista = generarPista();
                         if (pista) {
-                            broadcast({ type: "PISTA", contenido: pista });
+                            broadcast({ type: "PISTA", contenido: pista }); // 🟠 la misma pista a TODOS
                         }
                         enviarTurno();
                     }
+
 
                 }
             }
