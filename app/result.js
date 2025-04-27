@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     valorActivo: {
-        backgroundColor: '#2c3e50', // 🔥 Azul oscuro
+        backgroundColor: '#2c3e50',
         borderColor: '#00307a',
     },
     valorBtnTextoActivo: {

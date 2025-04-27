@@ -30,6 +30,7 @@ let bloquesPorJugador = {};
 let sesionesIndividuales = {};
 let jugadasMultijugador = [];
 let turnoTimeout = null;
+let equipos = {};
 
 const COLORES = ["red", "blue", "green", "orange", "purple"];
 
@@ -92,15 +93,43 @@ wss.on("connection", (ws) => {
 
                     broadcast({ type: "ENTRADA", totalJugadores: jugadores.length });
 
-                    if (jugadores.length >= 2) {
+                    if (jugadores.length === 10) {
+                        generarEquipos();
+
                         const pista = generarPista();
                         if (pista) {
                             broadcast({ type: "PISTA", contenido: pista });
                         }
                         enviarTurno();
                     }
+
                 }
             }
+            function generarEquipos() {
+                const nombres = jugadores.map(j => j.nombre);
+                const mezclados = nombres.sort(() => Math.random() - 0.5);
+
+                equipos = {}; // Reiniciar equipos
+
+                for (let i = 0; i < mezclados.length; i += 2) {
+                    const jugador1 = mezclados[i];
+                    const jugador2 = mezclados[i + 1];
+
+                    equipos[jugador1] = jugador2;
+                    equipos[jugador2] = jugador1;
+                }
+
+                // Informar a cada jugador quién es su compañero
+                jugadores.forEach(j => {
+                    if (j.readyState === WebSocket.OPEN) {
+                        j.send(JSON.stringify({
+                            type: "EQUIPO",
+                            compañero: equipos[j.nombre] || null,
+                        }));
+                    }
+                });
+            }
+
 
             if (msg.type === "JUGADA") {
                 if (ws.modo === "individual") {
@@ -268,13 +297,16 @@ function enviarTurno() {
     });
 
     turnoTimeout = setTimeout(() => {
-        jugadores[turnoActual].eliminado = true;
-        broadcast({
-            type: "MENSAJE",
-            contenido: `${jugadores[turnoActual].nombre} fue eliminado por inactividad.`,
-        });
-        avanzarTurno();
-    }, 60000); // 60 segundos
+        if (jugadores[turnoActual]) {
+            jugadores[turnoActual].eliminado = true;
+            broadcast({
+                type: "MENSAJE",
+                contenido: `${jugadores[turnoActual].nombre} fue eliminado por inactividad.`,
+            });
+            avanzarTurno();
+        }
+    }, 300000); // 300 segundos (5 minutos)
+
 }
 
 function calcularGanador(izq, der) {
@@ -315,6 +347,7 @@ function enviarResumenFinal() {
     bloquesTotales = 0;
     bloquesPorJugador = {};
     jugadasMultijugador = [];
+    equipos = {};
 }
 
 function generarPista() {

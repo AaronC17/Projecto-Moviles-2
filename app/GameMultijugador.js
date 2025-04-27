@@ -1,4 +1,3 @@
-// app/GameMultijugador.js
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -34,6 +33,7 @@ export default function GameMultijugador() {
     const [bloquesDer2, setBloquesDer2] = useState([]);
     const [miTurno, setMiTurno] = useState(false);
     const [jugadorEnTurno, setJugadorEnTurno] = useState('');
+    const [companero, setCompanero] = useState('');
     const [dropAreas1, setDropAreas1] = useState({ izquierdo: null, derecho: null });
     const [dropAreas2, setDropAreas2] = useState({ izquierdo: null, derecho: null });
     const [contador, setContador] = useState(300);
@@ -147,6 +147,15 @@ export default function GameMultijugador() {
                     },
                 });
             }
+            if (data.type === 'EQUIPO') {
+                setCompanero(data.compañero || '');
+                Alert.alert(
+                    "¡Equipo asignado!",
+                    `Tu compañero es: ${data.compañero}`,
+                    [{ text: "OK", onPress: () => setMostrarPista(true) }]
+                );
+            }
+
         };
 
         if (socket.readyState === WebSocket.OPEN) {
@@ -195,7 +204,7 @@ export default function GameMultijugador() {
             setPesoIzq2(p => p - bloque.peso);
         } else if (lado === 'derecho' && bloquesDer2.length) {
             bloque = bloquesDer2[bloquesDer2.length - 1];
-            setBloquesDer2(prev => prev.slice(0, -1));
+            setPesoDer2(prev => prev.slice(0, -1));
             setPesoDer2(p => p - bloque.peso);
         } else {
             Alert.alert("Nada que quitar en ese lado");
@@ -259,10 +268,13 @@ export default function GameMultijugador() {
         );
     };
 
-    if (jugadoresConectados < 2) {
+    if (jugadoresConectados < 10) {
         return (
             <View style={styles.centered}>
-                <Text style={styles.esperando}>Esperando jugadores... ({jugadoresConectados}/2)</Text>
+                <Text style={styles.esperando}>Esperando jugadores... ({jugadoresConectados}/10)</Text>
+                <Text style={{ marginTop: 10, fontSize: 16, color: '#999' }}>
+                    Necesitamos 10 jugadores para empezar.
+                </Text>
             </View>
         );
     }
@@ -278,6 +290,7 @@ export default function GameMultijugador() {
             </Modal>
 
             <Text style={styles.titulo}>Jugador: {nombre}</Text>
+            <Text style={styles.subtitulo}>Tu compañero: {companero}</Text>
             <Text style={styles.subtitulo}>Turno de: {jugadorEnTurno}</Text>
 
             {miTurno && (
