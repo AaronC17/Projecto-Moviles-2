@@ -48,6 +48,10 @@ wss.on("connection", (ws) => {
         try {
             const msg = JSON.parse(data);
 
+            if (msg.type === "FORZAR_RESUMEN") {
+                enviarResumenFinal();
+                return;
+            }
             if (msg.type === "ENTRADA") {
                 ws.nombre = msg.jugador;
                 ws.modo = msg.modo || "multijugador";

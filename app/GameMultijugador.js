@@ -7,14 +7,16 @@ import {
     Text,
     ScrollView,
     StyleSheet,
-    Animated,
-    PanResponder,
     Button,
     Alert,
     Modal,
+    TouchableOpacity,
+    Animated,
 } from 'react-native';
 import { getSocket } from '../sockets/connection';
 import BalanzaAnimada from '../components/BalanzaAnimada';
+
+const COLORES = ['red', 'blue', 'green', 'orange', 'purple'];
 
 export default function GameMultijugador() {
     const { nombre } = useLocalSearchParams();
@@ -39,29 +41,30 @@ export default function GameMultijugador() {
     const [jugadoresConectados, setJugadoresConectados] = useState(0);
     const [mostrarPista, setMostrarPista] = useState(false);
     const [pista, setPista] = useState('');
+    const [selectedBlock, setSelectedBlock] = useState(null);
     const intervaloRef = useRef(null);
 
+    // Inicializo bloques
+    useEffect(() => {
+        const nuevos = [];
+        COLORES.forEach(color => {
+            const pesoComun = (Math.floor(Math.random() * 10) + 1) * 2;
+            for (let i = 0; i < 2; i++) {
+                nuevos.push({ id: `${color}-${i}`, color, peso: pesoComun, pan: new Animated.ValueXY() });
+            }
+        });
+        setBloques(nuevos);
+    }, []);
+
+    // WebSocket
     useEffect(() => {
         if (!socket) return;
-
-        socket.onmessage = (e) => {
+        socket.onmessage = e => {
             const data = JSON.parse(e.data);
-
             switch (data.type) {
                 case 'ENTRADA':
                     setJugadoresConectados(data.totalJugadores || 0);
                     break;
-
-                case 'BLOQUES':
-                    // Recibimos del servidor los bloques con id, color y peso
-                    setBloques(
-                        data.bloques.map(b => ({
-                            ...b,
-                            pan: new Animated.ValueXY(),
-                        }))
-                    );
-                    break;
-
                 case 'TURNO':
                     setMiTurno(data.tuTurno);
                     setJugadorEnTurno(data.jugadorEnTurno);
@@ -69,47 +72,31 @@ export default function GameMultijugador() {
                         clearInterval(intervaloRef.current);
                         setContador(300);
                         intervaloRef.current = setInterval(() => {
-                            setContador(prev => {
-                                if (prev <= 1) {
-                                    clearInterval(intervaloRef.current);
-                                    return 0;
-                                }
-                                return prev - 1;
-                            });
+                            setContador(p => (p <= 1 ? (clearInterval(intervaloRef.current), 0) : p - 1));
                         }, 1000);
                     }
                     break;
-
                 case 'ACTUALIZAR_BALANZA':
                     setPesoIzq1(data.izquierdo || 0);
                     setPesoDer1(data.derecho || 0);
                     if (data.bloque) {
-                        const nb = {
-                            ...data.bloque,
-                            pan: new Animated.ValueXY(),
-                        };
-                        if (data.bloque.lado === 'izquierdo') setBloquesIzq1(prev => [...prev, nb]);
-                        else setBloquesDer1(prev => [...prev, nb]);
+                        const nb = { ...data.bloque, pan: new Animated.ValueXY() };
+                        if (data.bloque.lado === 'izquierdo') setBloquesIzq1(b => [...b, nb]);
+                        else setBloquesDer1(b => [...b, nb]);
                     }
                     break;
-
                 case 'MENSAJE':
-                    if (data.contenido.includes('fue eliminado')) {
-                        Alert.alert('Eliminación', data.contenido);
-                    }
+                    if (data.contenido.includes('fue eliminado')) Alert.alert('Eliminación', data.contenido);
                     break;
-
                 case 'EQUIPO':
                     setCompanero(data.compañero || '');
-                    Alert.alert('¡Equipo asignado!', `Tu compañero es: ${data.compañero}`, [{ text: 'OK' }]);
+                    Alert.alert('¡Equipo asignado!', `Tu compañero es: ${data.compañero}`);
                     break;
-
                 case 'PISTA':
                     setPista(data.contenido);
                     setMostrarPista(true);
                     setTimeout(() => setMostrarPista(false), 5000);
                     break;
-
                 case 'RESUMEN':
                     router.replace({
                         pathname: '/result',
@@ -120,134 +107,90 @@ export default function GameMultijugador() {
                         },
                     });
                     break;
-
-                default:
-                    break;
             }
         };
-
-        if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: 'ENTRADA', jugador: nombre, modo: 'multijugador' }));
-        } else {
-            socket.onopen = () => {
-                socket.send(JSON.stringify({ type: 'ENTRADA', jugador: nombre, modo: 'multijugador' }));
-            };
-        }
-
+        const msg = JSON.stringify({ type: 'ENTRADA', jugador: nombre, modo: 'multijugador' });
+        if (socket.readyState === WebSocket.OPEN) socket.send(msg);
+        else socket.onopen = () => socket.send(msg);
         return () => clearInterval(intervaloRef.current);
     }, []);
 
-    const enviarJugada = (bloque, lado) => {
-        if (!miTurno) return;
-        if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
+    // Tocar bloque para seleccionar
+    const renderBloque = bloque => {
+        const isSel = selectedBlock?.id === bloque.id;
+        return (
+            <TouchableOpacity
+                key={bloque.id}
+                onPress={() => setSelectedBlock(bloque)}
+                activeOpacity={0.7}
+                style={styles.bloqueWrapper}
+            >
+                <Animated.View
+                    style={[
+                        styles.bloque,
+                        { backgroundColor: bloque.color },
+                        isSel && { transform: [{ scale: 1.2 }] },
+                    ]}
+                />
+            </TouchableOpacity>
+        );
+    };
+
+    // Enviar jugada
+    const enviarJugada = lado => {
+        if (!miTurno || !selectedBlock) return;
+        socket.send(
+            JSON.stringify({
                 type: 'JUGADA',
                 jugador: nombre,
-                id: bloque.id,
-                color: bloque.color,
+                peso: selectedBlock.peso,
+                color: selectedBlock.color,
                 lado,
-            }));
-        }
-        setBloques(prev => prev.filter(b => b.id !== bloque.id));
+            })
+        );
+        setBloques(b => b.filter(x => x.id !== selectedBlock.id));
+        setSelectedBlock(null);
         setMiTurno(false);
         clearInterval(intervaloRef.current);
     };
 
-    const colocarPrueba = (bloque, lado) => {
+    // Prueba libre
+    const colocarPrueba = lado => {
+        if (!selectedBlock) return;
         if (lado === 'izquierdo') {
-            setPesoIzq2(p => p + bloque.peso);
-            setBloquesIzq2(prev => [...prev, bloque]);
+            setPesoIzq2(p => p + selectedBlock.peso);
+            setBloquesIzq2(b => [...b, selectedBlock]);
         } else {
-            setPesoDer2(p => p + bloque.peso);
-            setBloquesDer2(prev => [...prev, bloque]);
+            setPesoDer2(p => p + selectedBlock.peso);
+            setBloquesDer2(b => [...b, selectedBlock]);
         }
-        setBloques(prev => prev.filter(b => b.id !== bloque.id));
+        setBloques(b => b.filter(x => x.id !== selectedBlock.id));
+        setSelectedBlock(null);
     };
 
-    const quitarUltimoBloque = (lado) => {
+    // Quitar último bloque
+    const quitarUltimoBloque = lado => {
         let bloque;
         if (lado === 'izquierdo' && bloquesIzq2.length) {
             bloque = bloquesIzq2.pop();
             setPesoIzq2(p => p - bloque.peso);
-            setBloques(prev => [...prev, bloque]);
+            setBloques(b => [...b, bloque]);
             setBloquesIzq2([...bloquesIzq2]);
         } else if (lado === 'derecho' && bloquesDer2.length) {
             bloque = bloquesDer2.pop();
             setPesoDer2(p => p - bloque.peso);
-            setBloques(prev => [...prev, bloque]);
+            setBloques(b => [...b, bloque]);
             setBloquesDer2([...bloquesDer2]);
         } else {
             Alert.alert('Nada que quitar en ese lado');
         }
     };
 
-    const MARGEN = 10;
-    const isInDropArea = (gesture, area) => {
-        if (!area) return false;
-        const { moveX, moveY } = gesture;
-        return (
-            moveX > area.x - MARGEN &&
-            moveX < area.x + area.width + MARGEN &&
-            moveY > area.y - MARGEN &&
-            moveY < area.y + area.height + MARGEN
-        );
-    };
-
-    const renderBloque = (bloque) => {
-        const panResponder = PanResponder.create({
-            onStartShouldSetPanResponder: () => miTurno,
-            onPanResponderGrant: () => bloque.pan.extractOffset(),
-            onPanResponderMove: Animated.event([null, {
-                dx: bloque.pan.x,
-                dy: bloque.pan.y,
-            }], { useNativeDriver: false }),
-            onPanResponderRelease: (_, gesture) => {
-                bloque.pan.flattenOffset();
-                const dropOrder = [
-                    { area: dropAreas1.izquierdo, action: () => enviarJugada(bloque, 'izquierdo') },
-                    { area: dropAreas1.derecho, action: () => enviarJugada(bloque, 'derecho') },
-                    { area: dropAreas2.izquierdo, action: () => colocarPrueba(bloque, 'izquierdo') },
-                    { area: dropAreas2.derecho, action: () => colocarPrueba(bloque, 'derecho') },
-                ];
-                let colocado = false;
-                for (const { area, action } of dropOrder) {
-                    if (isInDropArea(gesture, area)) {
-                        action();
-                        colocado = true;
-                        break;
-                    }
-                }
-                if (!colocado) {
-                    Animated.spring(bloque.pan, {
-                        toValue: { x: 0, y: 0 },
-                        useNativeDriver: false,
-                    }).start();
-                }
-            },
-        });
-
-        return (
-            <Animated.View
-                key={bloque.id}
-                {...panResponder.panHandlers}
-                style={[
-                    styles.bloque,
-                    { backgroundColor: bloque.color },
-                    { transform: bloque.pan.getTranslateTransform() },
-                ]}
-            />
-        );
-    };
-
     if (jugadoresConectados < 10) {
         return (
             <View style={styles.centered}>
-                <Text style={styles.esperando}>
-                    Esperando jugadores... ({jugadoresConectados}/10)
-                </Text>
-                <Text style={{ marginTop: 10, fontSize: 16, color: '#999' }}>
-                    Necesitamos 10 jugadores para empezar.
-                </Text>
+                <Text style={styles.esperando}>Esperando jugadores... ({jugadoresConectados}/10)</Text>
+                <Text style={styles.esperando}>Necesitamos 10 jugadores para empezar.</Text>
             </View>
         );
     }
@@ -267,27 +210,17 @@ export default function GameMultijugador() {
                     <Text style={styles.avatarText}>{nombre.charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={styles.info}>
-                    <Text style={styles.playerText}>
-                        Jugador: <Text style={styles.highlight}>{nombre}</Text>
-                    </Text>
-                    <Text style={styles.playerText}>
-                        Compañero: <Text style={styles.highlight}>{companero}</Text>
-                    </Text>
-                    <Text style={styles.playerText}>
-                        Turno de: <Text style={styles.highlight}>{jugadorEnTurno}</Text>
-                    </Text>
+                    <Text style={styles.playerText}>Jugador: <Text style={styles.highlight}>{nombre}</Text></Text>
+                    <Text style={styles.playerText}>Compañero: <Text style={styles.highlight}>{companero}</Text></Text>
+                    <Text style={styles.playerText}>Turno de: <Text style={styles.highlight}>{jugadorEnTurno}</Text></Text>
                 </View>
             </View>
 
-
             {miTurno && (
-                <Text style={styles.contador}>
-                    ⏱️ {Math.floor(contador / 60)}:
-                    {String(contador % 60).padStart(2, '0')}
-                </Text>
+                <Text style={styles.contador}>⏱️ {Math.floor(contador / 60)}:{String(contador % 60).padStart(2, '0')}</Text>
             )}
 
-            <Text style={styles.section}>Balanza 1 (finaliza turno):</Text>
+            <Text style={styles.section}>Balanza 1:</Text>
             <BalanzaAnimada
                 pesoIzq={pesoIzq1}
                 pesoDer={pesoDer1}
@@ -295,9 +228,10 @@ export default function GameMultijugador() {
                 bloquesDer={bloquesDer1}
                 setDropAreas={setDropAreas1}
                 allowRemove={false}
+                onPlace={enviarJugada}
             />
 
-            <Text style={styles.section}>Balanza 2 (prueba libre):</Text>
+            <Text style={styles.section}>Balanza 2:</Text>
             <BalanzaAnimada
                 pesoIzq={pesoIzq2}
                 pesoDer={pesoDer2}
@@ -305,25 +239,20 @@ export default function GameMultijugador() {
                 bloquesDer={bloquesDer2}
                 setDropAreas={setDropAreas2}
                 allowRemove={true}
+                onPlace={colocarPrueba}
             />
 
             <View style={styles.ra}>
-                <View style={{ flex: 1, marginRight: 10 }}>
-                    <Button
-                        title="Quitar izquierdo"
-                        onPress={() => quitarUltimoBloque('izquierdo')}
-                    />
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Button
-                        title="Quitar derecho"
-                        onPress={() => quitarUltimoBloque('derecho')}
-                    />
-                </View>
+                <Button title="Quitar izquierdo" onPress={() => quitarUltimoBloque('izquierdo')} />
+                <Button title="Quitar derecho" onPress={() => quitarUltimoBloque('derecho')} />
             </View>
 
             <View style={styles.bloquesContainer}>
                 {bloques.map(renderBloque)}
+            </View>
+
+            <View style={styles.finish}>
+                <Button title="Terminar partida" onPress={() => socket.send(JSON.stringify({ type: 'FORZAR_RESUMEN' }))} />
             </View>
         </ScrollView>
     );
@@ -331,22 +260,22 @@ export default function GameMultijugador() {
 
 const styles = StyleSheet.create({
     container: { flexGrow: 1, padding: 20, backgroundColor: '#fff' },
-    titulo: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-    subtitulo: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
-    contador: { fontSize: 16, color: 'red', marginBottom: 10 },
-    esperando: { fontSize: 18, color: '#666' },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    section: { fontSize: 16, fontWeight: 'bold', marginTop: 20 },
-    bloquesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 20 },
-    bloque: { width: 60, height: 60, borderRadius: 8, margin: 8 },
-    ra: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
-    modalBackground: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-    modalContainer: { backgroundColor: 'white', padding: 20, borderRadius: 10, alignItems: 'center' },
-    pistaTexto: { fontSize: 18, fontWeight: 'bold', color: '#333', textAlign: 'center' },
     header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, padding: 10, backgroundColor: '#eef3f8', borderRadius: 8 },
     avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2c3e50', justifyContent: 'center', alignItems: 'center' },
     avatarText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
     info: { marginLeft: 10 },
     playerText: { fontSize: 16, color: '#333' },
     highlight: { color: '#2c3e50', fontWeight: 'bold' },
+    contador: { fontSize: 16, color: 'red', marginBottom: 10 },
+    section: { fontSize: 16, fontWeight: 'bold', marginTop: 20 },
+    bloquesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 20 },
+    bloqueWrapper: { margin: 8 },
+    bloque: { width: 60, height: 60, borderRadius: 8 },
+    ra: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
+    finish: { marginTop: 20 },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    esperando: { fontSize: 18, color: '#666', marginVertical: 4 },
+    modalBackground: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+    modalContainer: { backgroundColor: 'white', padding: 20, borderRadius: 10, alignItems: 'center' },
+    pistaTexto: { fontSize: 18, fontWeight: 'bold', color: '#333', textAlign: 'center' },
 });
