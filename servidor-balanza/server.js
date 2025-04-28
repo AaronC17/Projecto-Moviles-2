@@ -272,12 +272,33 @@ function generarEquipos() {
 }
 
 function generarPista() {
-    const traducciones = { red: "rojo", blue: "azul", green: "verde", orange: "naranja", purple: "morado" };
-    const colores = Object.keys(pesosPorColor);
-    const idx = Math.floor(Math.random() * colores.length);
-    const color = colores[idx];
-    const peso = pesosPorColor[color];
-    return `🔎 Pista: El bloque ${traducciones[color]} pesa ${peso} gramos.`;
+    // Traductor de colores
+    const traducciones = {
+        red: "rojo",
+        blue: "azul",
+        green: "verde",
+        orange: "naranja",
+        purple: "morado",
+    };
+
+    // 1) Construir array de { color, peso }
+    const arr = Object.entries(pesosPorColor).map(
+        ([color, peso]) => ({ color, peso })
+    );
+
+    // 2) Ordenar de mayor a menor peso
+    arr.sort((a, b) => b.peso - a.peso);
+
+    // 3) Elegir un bloque al azar
+    const idx = Math.floor(Math.random() * arr.length);
+    const { color, peso } = arr[idx];
+
+    // 4) Ordinales en español
+    const ordinales = ["primero", "segundo", "tercero", "cuarto", "quinto"];
+    const ordinal = ordinales[idx] || `${idx + 1}º`;
+
+    // 5) Devolver la pista
+    return `🔎 Pista: El bloque ${traducciones[color]} es el ${ordinal} más pesado y pesa ${peso} g.`;
 }
 
 function broadcast(data) {

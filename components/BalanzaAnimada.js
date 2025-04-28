@@ -41,6 +41,11 @@ export default function BalanzaAnimada({
         setTimeout(medirAreas, 200);
     }, [bloquesIzq.length, bloquesDer.length, medirAreas]);
 
+    // Determinar indicación de inclinación
+    let indicador = 'Equilibrada';
+    if (pesoIzq > pesoDer) indicador = 'Inclinada a la izquierda';
+    else if (pesoDer > pesoIzq) indicador = 'Inclinada a la derecha';
+
     const renderBloques = (bloques, lado) =>
         bloques.map(b => (
             <View
@@ -57,10 +62,9 @@ export default function BalanzaAnimada({
 
     return (
         <View style={styles.wrapper}>
-            <Text style={styles.titulo} selectable={false}>⚖️ Balanza</Text>
+            <Text style={styles.indicatorText}>{indicador}</Text>
             <View style={styles.soporte}>
                 <View style={styles.baseVertical} />
-
                 <Animated.View
                     style={[
                         styles.barra,
@@ -78,19 +82,18 @@ export default function BalanzaAnimada({
                     <View style={styles.cuerdaDer} />
 
                     <View style={styles.platoIzq}>
-                        <Text style={styles.pesoText} selectable={false}>{pesoIzq}g</Text>
+                        <Text style={styles.pesoText}>{pesoIzq}g</Text>
                         <View ref={refIzq} style={styles.platoCaja}>
                             {renderBloques(bloquesIzq, 'izquierdo')}
                         </View>
                     </View>
 
                     <View style={styles.platoDer}>
-                        <Text style={styles.pesoText} selectable={false}>{pesoDer}g</Text>
+                        <Text style={styles.pesoText}>{pesoDer}g</Text>
                         <View ref={refDer} style={styles.platoCaja}>
                             {renderBloques(bloquesDer, 'derecho')}
                         </View>
                     </View>
-
                 </Animated.View>
             </View>
         </View>
@@ -99,7 +102,12 @@ export default function BalanzaAnimada({
 
 const styles = StyleSheet.create({
     wrapper: { alignItems: 'center', marginTop: 30 },
-    titulo: { marginBottom: 10, fontSize: 18, fontWeight: 'bold', color: '#333' },
+    indicatorText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 8,
+    },
     soporte: { height: 200, justifyContent: 'flex-start', alignItems: 'center' },
     baseVertical: { width: 8, height: 70, backgroundColor: '#666', borderRadius: 4 },
     barra: {
@@ -132,7 +140,13 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#ccc',
     },
-    pesoText: { position: 'absolute', bottom: 11, fontSize: 12, fontWeight: 'bold', color: 'black', zIndex: 2 },
+    pesoText: {
+        position: 'absolute',
+        bottom: 100,
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#000',
+    },
     miniBloque: {
         width: 15,
         height: 15,
