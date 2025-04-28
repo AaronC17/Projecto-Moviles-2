@@ -119,10 +119,17 @@ wss.on("connection", (ws) => {
                     broadcast({ type: "ENTRADA", totalJugadores: jugadores.length });
 
                     if (jugadores.length === 10) {
+                        // --- Reinicio de la balanza y conteo de jugadas ---
+                        pesoIzquierdo = 0;
+                        pesoDerecho = 0;
+                        totalJugadas = 0;
+                        jugadasMultijugador = [];
+
                         generarEquipos();
                         broadcast({ type: "PISTA", contenido: generarPista() });
                         enviarTurno();
                     }
+
                 }
             }
 
