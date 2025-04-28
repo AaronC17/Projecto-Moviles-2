@@ -1,5 +1,3 @@
-// GameMultijugador.js
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -12,6 +10,7 @@ import {
     Modal,
     TouchableOpacity,
     Animated,
+    Platform,
 } from 'react-native';
 import { getSocket } from '../sockets/connection';
 import BalanzaAnimada from '../components/BalanzaAnimada';
@@ -42,9 +41,9 @@ export default function GameMultijugador() {
     const [mostrarPista, setMostrarPista] = useState(false);
     const [pista, setPista] = useState('');
     const [selectedBlock, setSelectedBlock] = useState(null);
+    const [partidaIniciada, setPartidaIniciada] = useState(false);
     const intervaloRef = useRef(null);
 
-    // Inicializo bloques
     useEffect(() => {
         const nuevos = [];
         COLORES.forEach(color => {
@@ -56,14 +55,34 @@ export default function GameMultijugador() {
         setBloques(nuevos);
     }, []);
 
-    // WebSocket
     useEffect(() => {
         if (!socket) return;
+
         socket.onmessage = e => {
             const data = JSON.parse(e.data);
             switch (data.type) {
+                case 'ERROR':
+                    if (data.mensaje === "Partida en curso, no se puede ingresar.") {
+                        if (Platform.OS === 'web') {
+                            alert('🚫 La partida ya inició, no puedes ingresar.');
+                        } else {
+                            Alert.alert(
+                                '🚫 Partida en curso',
+                                'La partida ya inició, no puedes ingresar.',
+                                [{ text: 'OK', onPress: () => router.replace('/') }],
+                                { cancelable: false }
+                            );
+                        }
+                        return;
+                    }
+                    break;
                 case 'ENTRADA':
                     setJugadoresConectados(data.totalJugadores || 0);
+                    setPartidaIniciada(data.partidaEnCurso || false);
+                    break;
+
+                case 'PARTIDA_INICIADA':
+                    setPartidaIniciada(true);
                     break;
                 case 'TURNO':
                     setMiTurno(data.tuTurno);
@@ -86,7 +105,28 @@ export default function GameMultijugador() {
                     }
                     break;
                 case 'MENSAJE':
-                    if (data.contenido.includes('fue eliminado')) Alert.alert('Eliminación', data.contenido);
+                    if (data.contenido.includes('fue eliminado')) {
+                        const nombreEnMensaje = data.contenido.split(' ')[0].trim();
+                        if (nombreEnMensaje.toLowerCase() === nombre.toLowerCase()) {
+                            if (Platform.OS === 'web') {
+                                alert('¡Has sido eliminado!\n' + data.contenido);
+                                router.replace('/');
+                            } else {
+                                Alert.alert(
+                                    '¡Has sido eliminado!',
+                                    data.contenido,
+                                    [{ text: 'OK', onPress: () => router.replace('/') }],
+                                    { cancelable: false }
+                                );
+                            }
+                        } else {
+                            if (Platform.OS === 'web') {
+                                alert(data.contenido);
+                            } else {
+                                Alert.alert('Eliminación', data.contenido);
+                            }
+                        }
+                    }
                     break;
                 case 'EQUIPO':
                     setCompanero(data.compañero || '');
@@ -109,13 +149,14 @@ export default function GameMultijugador() {
                     break;
             }
         };
+
         const msg = JSON.stringify({ type: 'ENTRADA', jugador: nombre, modo: 'multijugador' });
         if (socket.readyState === WebSocket.OPEN) socket.send(msg);
         else socket.onopen = () => socket.send(msg);
+
         return () => clearInterval(intervaloRef.current);
     }, []);
 
-    // Tocar bloque para seleccionar
     const renderBloque = bloque => {
         const isSel = selectedBlock?.id === bloque.id;
         return (
@@ -136,7 +177,6 @@ export default function GameMultijugador() {
         );
     };
 
-    // Enviar jugada
     const enviarJugada = lado => {
         if (!miTurno || !selectedBlock) return;
         socket.send(
@@ -154,7 +194,6 @@ export default function GameMultijugador() {
         clearInterval(intervaloRef.current);
     };
 
-    // Prueba libre
     const colocarPrueba = lado => {
         if (!selectedBlock) return;
         if (lado === 'izquierdo') {
@@ -168,7 +207,6 @@ export default function GameMultijugador() {
         setSelectedBlock(null);
     };
 
-    // Quitar último bloque
     const quitarUltimoBloque = lado => {
         let bloque;
         if (lado === 'izquierdo' && bloquesIzq2.length) {
@@ -186,7 +224,7 @@ export default function GameMultijugador() {
         }
     };
 
-    if (jugadoresConectados < 10) {
+    if (!partidaIniciada) {
         return (
             <View style={styles.centered}>
                 <Text style={styles.esperando}>Esperando jugadores... ({jugadoresConectados}/10)</Text>

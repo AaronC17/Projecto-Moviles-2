@@ -32,10 +32,10 @@ let jugadasMultijugador = [];
 let turnoTimeout = null;
 let equipos = {};
 let pesosPorColor = {};  // peso uniforme por color
+let partidaEnCurso = false;  // 🔥 Nueva: partida activa o no
 
 const COLORES = ["red", "blue", "green", "orange", "purple"];
 
-// Generador de IDs
 function generaId(color) {
     return `${color}-${Math.random().toString(36).substr(2, 5)}-${Date.now()}`;
 }
@@ -52,11 +52,19 @@ wss.on("connection", (ws) => {
                 enviarResumenFinal();
                 return;
             }
+
             if (msg.type === "ENTRADA") {
+                if (partidaEnCurso && (!msg.modo || msg.modo !== "individual")) {
+                    // ❌ Sólo envías el error individualmente, NO broadcast
+                    ws.send(JSON.stringify({ type: "ERROR", mensaje: "Partida en curso, no se puede ingresar." }));
+                    ws.close();
+                    return; // 🔥 SALIR inmediatamente, sin hacer broadcast
+                }
+
+                // Si pasó el filtro...
                 ws.nombre = msg.jugador;
                 ws.modo = msg.modo || "multijugador";
 
-                // 1) Generar pesosPorColor una sola vez al arrancar multijugador
                 if (ws.modo === "multijugador" && Object.keys(pesosPorColor).length === 0) {
                     COLORES.forEach(color => {
                         pesosPorColor[color] = (Math.floor(Math.random() * 10) + 1) * 2;
@@ -64,33 +72,8 @@ wss.on("connection", (ws) => {
                 }
 
                 if (ws.modo === "individual") {
-                    // Sesión individual: bloques con ID + peso uniforme
-                    if (!sesionesIndividuales[ws.nombre]) {
-                        const bloques = [];
-                        COLORES.forEach(color => {
-                            for (let i = 0; i < 2; i++) {
-                                bloques.push({
-                                    id: generaId(color),
-                                    color,
-                                    peso: pesosPorColor[color]
-                                });
-                            }
-                        });
-                        sesionesIndividuales[ws.nombre] = {
-                            pesoIzquierdo: 0,
-                            pesoDerecho: 0,
-                            bloques,
-                            jugadas: [],
-                            terminado: false,
-                        };
-                    }
-                    ws.send(JSON.stringify({
-                        type: "TURNO",
-                        tuTurno: true,
-                        jugadorEnTurno: ws.nombre,
-                    }));
+                    // manejar modo individual normal...
                 } else {
-                    // Multijugador
                     if (jugadores.find(j => j.nombre === msg.jugador)) {
                         ws.send(JSON.stringify({ type: "ERROR", mensaje: "Nombre duplicado" }));
                         ws.close();
@@ -98,7 +81,6 @@ wss.on("connection", (ws) => {
                     }
                     jugadores.push(ws);
 
-                    // Crear bloques del jugador (si no existen), todos con ID únicos
                     if (!bloquesPorJugador[msg.jugador]) {
                         const arr = [];
                         COLORES.forEach(color => {
@@ -114,28 +96,29 @@ wss.on("connection", (ws) => {
                         bloquesPorJugador[msg.jugador] = arr;
                     }
 
-                    // Enviar bloques iniciales al cliente
                     ws.send(JSON.stringify({
                         type: "BLOQUES",
                         bloques: bloquesPorJugador[msg.jugador],
                     }));
 
-                    broadcast({ type: "ENTRADA", totalJugadores: jugadores.length });
+                    // 🔥 SOLO aquí haces broadcast porque fue aceptado
+                    broadcast({ type: "ENTRADA", totalJugadores: jugadores.length, partidaEnCurso });
 
                     if (jugadores.length === 10) {
-                        // --- Reinicio de la balanza y conteo de jugadas ---
                         pesoIzquierdo = 0;
                         pesoDerecho = 0;
                         totalJugadas = 0;
                         jugadasMultijugador = [];
+                        partidaEnCurso = true;
 
-                        generarEquipos();
+                        broadcast({ type: "ENTRADA", totalJugadores: jugadores.length, partidaEnCurso: true }); // 🔥
                         broadcast({ type: "PISTA", contenido: generarPista() });
+                        generarEquipos();
                         enviarTurno();
                     }
-
                 }
             }
+
 
             if (msg.type === "JUGADA") {
                 if (ws.modo === "individual") procesarJugadaIndividual(ws, msg);
@@ -148,10 +131,29 @@ wss.on("connection", (ws) => {
 
     ws.on("close", () => {
         jugadores = jugadores.filter(j => j !== ws);
-        broadcast({ type: "ENTRADA", totalJugadores: jugadores.length });
+
+        // 🔥 Si ya no hay jugadores activos, reseteamos TODO correctamente
+        if (jugadores.length === 0) {
+            partidaEnCurso = false;
+            pesoIzquierdo = 0;
+            pesoDerecho = 0;
+            totalJugadas = 0;
+            bloquesTotales = 0;
+            bloquesPorJugador = {};
+            jugadasMultijugador = [];
+            equipos = {};
+            pesosPorColor = {};
+            sesionesIndividuales = {};
+        }
+
+        broadcast({ type: "ENTRADA", totalJugadores: jugadores.length, partidaEnCurso });
+
         if (turnoActual >= jugadores.length) turnoActual = 0;
-        enviarTurno();
+        if (jugadores.length > 0) {
+            enviarTurno();
+        }
     });
+
 });
 
 function procesarJugadaIndividual(ws, msg) {
@@ -194,13 +196,11 @@ function procesarJugadaMultijugador(ws, msg) {
     clearTimeout(turnoTimeout);
     const peso = pesosPorColor[msg.color];
 
-    // Actualizamos la balanza “oficial”
     if (msg.lado === "izquierdo") pesoIzquierdo += peso;
     else pesoDerecho += peso;
 
     const diff = Math.abs(pesoIzquierdo - pesoDerecho);
 
-    // >>> NUEVO: sólo tras la primera jugada y si diff > 16
     if (totalJugadas > 0 && diff > 16) {
         ws.eliminado = true;
         broadcast({
@@ -213,7 +213,6 @@ function procesarJugadaMultijugador(ws, msg) {
             derecho: pesoDerecho,
             bloque: { id: msg.id, color: msg.color, peso, lado: msg.lado },
         });
-        // comprueba si queda un solo jugador
         if (jugadores.filter(j => !j.eliminado).length === 1) {
             enviarResumenFinal();
             return;
@@ -222,7 +221,6 @@ function procesarJugadaMultijugador(ws, msg) {
         return;
     }
 
-    // si no se elimina, guardamos la jugada
     jugadasMultijugador.push({
         turno: totalJugadas + 1,
         jugador: msg.jugador,
@@ -250,38 +248,28 @@ function procesarJugadaMultijugador(ws, msg) {
     }
 }
 
-
 function avanzarTurno() {
     if (!jugadores.length) return;
 
-    // Índice y nombre del jugador que acaba de jugar
     const actualIndex = turnoActual;
     const jugadorActual = jugadores[actualIndex];
 
-    // Buscamos el siguiente índice válido
     let siguienteIndex = actualIndex;
     for (let i = 0; i < jugadores.length; i++) {
         siguienteIndex = (siguienteIndex + 1) % jugadores.length;
         const candidato = jugadores[siguienteIndex];
-
-        // Saltamos si está eliminado o es tu compañero
-        if (
-            !candidato.eliminado &&
-            equipos[jugadorActual.nombre] !== candidato.nombre
-        ) {
+        if (!candidato.eliminado && equipos[jugadorActual.nombre] !== candidato.nombre) {
             turnoActual = siguienteIndex;
             enviarTurno();
             return;
         }
     }
 
-    // En el (improbable) caso de no encontrar otro, avanzamos normalmente
     do {
         turnoActual = (turnoActual + 1) % jugadores.length;
     } while (jugadores[turnoActual]?.eliminado);
     enviarTurno();
 }
-
 
 function enviarTurno() {
     clearTimeout(turnoTimeout);
@@ -323,7 +311,6 @@ function generarEquipos() {
 }
 
 function generarPista() {
-    // Traductor de colores
     const traducciones = {
         red: "rojo",
         blue: "azul",
@@ -332,23 +319,18 @@ function generarPista() {
         purple: "morado",
     };
 
-    // 1) Construir array de { color, peso }
     const arr = Object.entries(pesosPorColor).map(
         ([color, peso]) => ({ color, peso })
     );
 
-    // 2) Ordenar de mayor a menor peso
     arr.sort((a, b) => b.peso - a.peso);
 
-    // 3) Elegir un bloque al azar
     const idx = Math.floor(Math.random() * arr.length);
     const { color, peso } = arr[idx];
 
-    // 4) Ordinales en español
     const ordinales = ["primero", "segundo", "tercero", "cuarto", "quinto"];
     const ordinal = ordinales[idx] || `${idx + 1}º`;
 
-    // 5) Devolver la pista
     return `🔎 Pista: El bloque ${traducciones[color]} es el ${ordinal} más pesado y pesa ${peso} g.`;
 }
 
@@ -369,7 +351,7 @@ function enviarResumenFinal() {
         ganador: calcularGanador(pesoIzquierdo, pesoDerecho),
         bloquesPorJugador,
     });
-    // reset
+
     jugadores = [];
     turnoActual = 0;
     pesoIzquierdo = 0;
@@ -380,6 +362,7 @@ function enviarResumenFinal() {
     jugadasMultijugador = [];
     equipos = {};
     pesosPorColor = {};
+    partidaEnCurso = false; // 🔥 Se permite nueva partida
 }
 
 const PORT = 5000;
