@@ -1,5 +1,3 @@
-// components/BalanzaAnimada.js
-
 import React, { useRef, useEffect, useCallback } from 'react';
 import {
     View,
@@ -23,7 +21,6 @@ export default function BalanzaAnimada({
     const refIzq = useRef(null);
     const refDer = useRef(null);
 
-    // 1) Animación de inclinación
     useEffect(() => {
         const diff = pesoIzq - pesoDer;
         const final = Math.max(Math.min(diff, 50), -50);
@@ -34,7 +31,6 @@ export default function BalanzaAnimada({
         }).start();
     }, [pesoIzq, pesoDer]);
 
-    // 2) Medir áreas de drop
     const medirAreas = useCallback(() => {
         if (refIzq.current) {
             refIzq.current.measureInWindow((x, y, width, height) =>
@@ -52,18 +48,37 @@ export default function BalanzaAnimada({
         setTimeout(medirAreas, 200);
     }, [bloquesIzq.length, bloquesDer.length, medirAreas]);
 
-    // 3) Render de mini-bloques (con key única, usando idx de fallback)
-    const renderBloques = (bloques, lado) =>
-        bloques.map((b, idx) => (
+    // Agrupar bloques por color
+    const agruparBloques = (bloques) => {
+        const agrupados = {};
+        bloques.forEach(bloque => {
+            if (!agrupados[bloque.color]) {
+                agrupados[bloque.color] = { ...bloque, cantidad: 1 };
+            } else {
+                agrupados[bloque.color].cantidad += 1;
+            }
+        });
+        return Object.values(agrupados);
+    };
+
+    // Render de bloques agrupados
+    const renderBloques = (bloques, lado) => (
+        agruparBloques(bloques).map((b, idx) => (
             <View
-                key={`${lado}-${b.id ?? idx}`}
-                style={[styles.miniBloque, { backgroundColor: b.color }]}
+                key={`${lado}-${b.color}-${idx}`}
+                style={{ alignItems: 'center', margin: 3 }}
                 onStartShouldSetResponder={() => true}
                 onResponderLongPress={() => {
                     if (allowRemove && onRemove) onRemove(b, lado);
                 }}
-            />
-        ));
+            >
+                <View style={[styles.miniBloque, { backgroundColor: b.color, justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={styles.cantidadTexto}>{b.cantidad}</Text>
+                </View>
+            </View>
+        ))
+    );
+
 
     return (
         <View style={styles.wrapper}>
@@ -198,9 +213,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#ddd',
     },
     miniBloque: {
-        width: 15,
-        height: 15,
-        borderRadius: 4,
-        margin: 1.5,
+        width: 24,
+        height: 24,
+        borderRadius: 6,
     },
+    cantidadTexto: {
+        color: 'white', // 🔥 Blanco para que resalte
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+
 });
