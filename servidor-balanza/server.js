@@ -233,11 +233,35 @@ function procesarJugadaMultijugador(ws, msg) {
 
 function avanzarTurno() {
     if (!jugadores.length) return;
+
+    // Índice y nombre del jugador que acaba de jugar
+    const actualIndex = turnoActual;
+    const jugadorActual = jugadores[actualIndex];
+
+    // Buscamos el siguiente índice válido
+    let siguienteIndex = actualIndex;
+    for (let i = 0; i < jugadores.length; i++) {
+        siguienteIndex = (siguienteIndex + 1) % jugadores.length;
+        const candidato = jugadores[siguienteIndex];
+
+        // Saltamos si está eliminado o es tu compañero
+        if (
+            !candidato.eliminado &&
+            equipos[jugadorActual.nombre] !== candidato.nombre
+        ) {
+            turnoActual = siguienteIndex;
+            enviarTurno();
+            return;
+        }
+    }
+
+    // En el (improbable) caso de no encontrar otro, avanzamos normalmente
     do {
         turnoActual = (turnoActual + 1) % jugadores.length;
-    } while (jugadores[turnoActual].eliminado);
+    } while (jugadores[turnoActual]?.eliminado);
     enviarTurno();
 }
+
 
 function enviarTurno() {
     clearTimeout(turnoTimeout);
