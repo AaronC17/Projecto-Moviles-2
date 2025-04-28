@@ -1,52 +1,64 @@
-import { useRouter } from "expo-router";
-import { View, Text, TouchableOpacity, TextInput, StyleSheet } from "react-native";
-import { useState } from "react";
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'expo-router';
+import {
+    View,
+    Text,
+    TextInput,
+    Button,
+    StyleSheet,
+    Alert,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export default function Index() {
+export default function Home() {
+    const [nombre, setNombre] = useState('');
     const router = useRouter();
-    const [nombre, setNombre] = useState("");
+
+    useEffect(() => {
+        const cargarNombre = async () => {
+            const guardado = await AsyncStorage.getItem('nombreJugador');
+            if (guardado) setNombre(guardado);
+        };
+        cargarNombre();
+    }, []);
 
     const navegar = (modo) => {
-        if (!nombre.trim()) return alert("Ingresá tu nombre");
-        router.push(`/game?nombre=${encodeURIComponent(nombre)}&modo=${modo}`);
+        if (!nombre.trim()) return Alert.alert('⚠️ Escribe tu nombre');
+        AsyncStorage.setItem('nombreJugador', nombre);
+        router.push({
+            pathname: modo === 'individual' ? '/GameIndividual' : '/GameMultijugador',
+            params: { nombre, modo },
+        });
     };
 
     return (
         <View style={styles.container}>
             <Text style={styles.titulo}>🎮 Juego de la Balanza</Text>
             <TextInput
-                placeholder="Tu nombre"
+                style={styles.input}
+                placeholder="Ingresa tu nombre"
                 value={nombre}
                 onChangeText={setNombre}
-                style={styles.input}
             />
-            <TouchableOpacity style={styles.boton} onPress={() => navegar("individual")}>
-                <Text style={styles.botonTexto}>Jugar Individual</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.boton} onPress={() => navegar("multijugador")}>
-                <Text style={styles.botonTexto}>Jugar Multijugador</Text>
-            </TouchableOpacity>
+            <View style={styles.boton}>
+                <Button title="Jugar Individual" onPress={() => navegar('individual')} />
+            </View>
+            <View style={styles.boton}>
+                <Button title="Jugar Multijugador" onPress={() => navegar('multijugador')} />
+            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
-    titulo: { fontSize: 24, fontWeight: "bold", marginBottom: 30 },
+    container: { flex: 1, justifyContent: 'center', padding: 20 },
+    titulo: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 30 },
     input: {
         borderWidth: 1,
-        borderColor: "#ccc",
+        borderColor: '#ccc',
+        borderRadius: 8,
         padding: 10,
-        width: "100%",
         marginBottom: 20,
-        borderRadius: 6,
     },
-    boton: {
-        backgroundColor: "#2c3e50",
-        padding: 12,
-        marginVertical: 8,
-        borderRadius: 6,
-        width: "100%",
-    },
-    botonTexto: { color: "white", textAlign: "center", fontWeight: "bold" },
+    boton: { marginTop: 10 },
 });
