@@ -315,17 +315,42 @@ function generarPista() {
         red: "rojo",
         blue: "azul",
         green: "verde",
-        orange: "naranja",
+        orange: "amarillo",
         purple: "morado",
     };
+
     const arr = Object.entries(pesosPorColor).map(([color, peso]) => ({ color, peso }));
-    arr.sort((a, b) => b.peso - a.peso);
+    arr.sort((a, b) => b.peso - a.peso); // Ordenar de mayor a menor
+
     const idx = Math.floor(Math.random() * arr.length);
     const { color, peso } = arr[idx];
-    const ordinales = ["primero", "segundo", "tercero", "cuarto", "quinto"];
-    const ordinal = ordinales[idx] || `${idx + 1}º`;
-    return `🔎 Pista: El bloque ${traducciones[color]} es el ${ordinal} más pesado y pesa ${peso} g.`;
+
+    let descripcion;
+    switch (idx) {
+        case 0:
+            descripcion = "el más pesado";
+            break;
+        case 1:
+            descripcion = "el segundo más pesado";
+            break;
+        case 2:
+            descripcion = "el tercero más pesado";
+            break;
+        case 3:
+            descripcion = "el cuarto más pesado";
+            break;
+        case 4:
+            descripcion = "el más liviano";
+            break;
+        default:
+            descripcion = `${idx + 1}º más pesado`;
+            break;
+    }
+
+    return `🔎 Pista: El bloque ${traducciones[color]} es ${descripcion} y pesa ${peso} g.`;
 }
+
+
 
 function broadcast(data) {
     const msg = JSON.stringify(data);

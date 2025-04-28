@@ -1,11 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import {
-    View,
-    Text,
-    Animated,
-    StyleSheet,
-    TouchableOpacity,
-} from 'react-native';
+import { View, Text, Animated, StyleSheet, TouchableOpacity } from 'react-native';
 
 export default function BalanzaAnimada({
     pesoIzq,
@@ -20,11 +14,9 @@ export default function BalanzaAnimada({
     const inclinAnim = useRef(new Animated.Value(0)).current;
     const refIzq = useRef(null);
     const refDer = useRef(null);
+    const barraDiff = useRef(new Animated.Value(0)).current;
 
-    const barraIzq = useRef(new Animated.Value(0)).current;
-    const barraDer = useRef(new Animated.Value(0)).current;
-
-    const pesoMaximo = 200; // Peso máximo para llenar la barra
+    const diferenciaMaxima = 16; // 🔥 máximo permitido de diferencia
 
     useEffect(() => {
         const diff = pesoIzq - pesoDer;
@@ -35,15 +27,10 @@ export default function BalanzaAnimada({
             useNativeDriver: true,
         }).start();
 
-        Animated.timing(barraIzq, {
-            toValue: Math.min(pesoIzq / pesoMaximo, 1),
-            duration: 500,
-            useNativeDriver: false,
-        }).start();
-
-        Animated.timing(barraDer, {
-            toValue: Math.min(pesoDer / pesoMaximo, 1),
-            duration: 500,
+        const diferencia = Math.min(Math.abs(pesoIzq - pesoDer) / diferenciaMaxima, 1);
+        Animated.timing(barraDiff, {
+            toValue: diferencia,
+            duration: 300, // 🔥 Más rápido
             useNativeDriver: false,
         }).start();
     }, [pesoIzq, pesoDer]);
@@ -95,9 +82,10 @@ export default function BalanzaAnimada({
             <View style={styles.soporte}>
                 <View style={styles.baseVertical} />
 
+                {/* TODO inclinado */}
                 <Animated.View
                     style={[
-                        styles.barra,
+                        styles.barraYbarraInferior,
                         {
                             transform: [
                                 {
@@ -110,53 +98,53 @@ export default function BalanzaAnimada({
                         },
                     ]}
                 >
-                    <View style={styles.cuerdaIzq} />
-                    <View style={styles.cuerdaDer} />
+                    <View style={styles.barra}>
+                        <View style={styles.cuerdaIzq} />
+                        <View style={styles.cuerdaDer} />
 
-                    {/* Platillo izquierdo */}
-                    <TouchableOpacity
-                        ref={refIzq}
-                        onLayout={medirAreas}
-                        onPress={() => onPlace && onPlace('izquierdo')}
-                        activeOpacity={0.6}
-                        style={styles.platoIzq}
-                    >
-                        <View style={[styles.platoCaja, styles.dropZona]}>
-                            {renderBloques(bloquesIzq, 'izq')}
-                        </View>
-                        <View style={styles.progresoWrapper}>
-                            <Animated.View style={[styles.progresoBarra, {
-                                width: barraIzq.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: ['0%', '100%'],
-                                })
-                            }]} />
-                        </View>
-                        <Text style={styles.pesoTexto}>{pesoIzq} g</Text> {/* 🔥 peso mostrado */}
-                    </TouchableOpacity>
+                        {/* Platillo izquierdo */}
+                        <TouchableOpacity
+                            ref={refIzq}
+                            onLayout={medirAreas}
+                            onPress={() => onPlace && onPlace('izquierdo')}
+                            activeOpacity={0.6}
+                            style={styles.platoIzq}
+                        >
+                            <View style={[styles.platoCaja, styles.dropZona]}>
+                                {renderBloques(bloquesIzq, 'izq')}
+                            </View>
+                            <Text style={styles.pesoTexto}>{pesoIzq} g</Text>
+                        </TouchableOpacity>
 
-                    {/* Platillo derecho */}
-                    <TouchableOpacity
-                        ref={refDer}
-                        onLayout={medirAreas}
-                        onPress={() => onPlace && onPlace('derecho')}
-                        activeOpacity={0.6}
-                        style={styles.platoDer}
-                    >
-                        <View style={[styles.platoCaja, styles.dropZona]}>
-                            {renderBloques(bloquesDer, 'der')}
-                        </View>
-                        <View style={styles.progresoWrapper}>
-                            <Animated.View style={[styles.progresoBarra, {
-                                width: barraDer.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: ['0%', '100%'],
-                                })
-                            }]} />
-                        </View>
-                        <Text style={styles.pesoTexto}>{pesoDer} g</Text> {/* 🔥 peso mostrado */}
-                    </TouchableOpacity>
+                        {/* Platillo derecho */}
+                        <TouchableOpacity
+                            ref={refDer}
+                            onLayout={medirAreas}
+                            onPress={() => onPlace && onPlace('derecho')}
+                            activeOpacity={0.6}
+                            style={styles.platoDer}
+                        >
+                            <View style={[styles.platoCaja, styles.dropZona]}>
+                                {renderBloques(bloquesDer, 'der')}
+                            </View>
+                            <Text style={styles.pesoTexto}>{pesoDer} g</Text>
+                        </TouchableOpacity>
+                    </View>
 
+                    {/* 🔥 Barra diferencia ABAJO */}
+                    <View style={styles.progresoWrapper}>
+                        <Animated.View
+                            style={[
+                                styles.progresoBarra,
+                                {
+                                    width: barraDiff.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: ['0%', '100%'],
+                                    }),
+                                },
+                            ]}
+                        />
+                    </View>
                 </Animated.View>
             </View>
         </View>
@@ -164,27 +152,11 @@ export default function BalanzaAnimada({
 }
 
 const styles = StyleSheet.create({
-    wrapper: {
-        alignItems: 'center',
-        marginTop: 30,
-    },
-    titulo: {
-        marginBottom: 10,
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    soporte: {
-        height: 240,
-        justifyContent: 'flex-start',
-        alignItems: 'center',
-    },
-    baseVertical: {
-        width: 8,
-        height: 70,
-        backgroundColor: '#666',
-        borderRadius: 4,
-    },
+    wrapper: { alignItems: 'center', marginTop: 30 },
+    titulo: { marginBottom: 10, fontSize: 18, fontWeight: 'bold', color: '#333' },
+    soporte: { height: 300, justifyContent: 'flex-start', alignItems: 'center' },
+    baseVertical: { width: 8, height: 70, backgroundColor: '#666', borderRadius: 4 },
+    barraYbarraInferior: { alignItems: 'center' },
     barra: {
         width: 270,
         height: 15,
@@ -198,34 +170,10 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 4,
     },
-    cuerdaIzq: {
-        position: 'absolute',
-        left: 46,
-        bottom: -14,
-        width: 2,
-        height: 15,
-        backgroundColor: '#2c3e50',
-    },
-    cuerdaDer: {
-        position: 'absolute',
-        right: 48,
-        bottom: -14,
-        width: 2,
-        height: 15,
-        backgroundColor: '#2c3e50',
-    },
-    platoIzq: {
-        position: 'absolute',
-        left: 0,
-        bottom: -130,
-        alignItems: 'center',
-    },
-    platoDer: {
-        position: 'absolute',
-        right: 0,
-        bottom: -130,
-        alignItems: 'center',
-    },
+    cuerdaIzq: { position: 'absolute', left: 46, bottom: -14, width: 2, height: 15, backgroundColor: '#2c3e50' },
+    cuerdaDer: { position: 'absolute', right: 48, bottom: -14, width: 2, height: 15, backgroundColor: '#2c3e50' },
+    platoIzq: { position: 'absolute', left: 0, bottom: -130, alignItems: 'center' },
+    platoDer: { position: 'absolute', right: 0, bottom: -130, alignItems: 'center' },
     platoCaja: {
         width: 96,
         height: 96,
@@ -237,32 +185,20 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#ccc',
     },
-    dropZona: {
-        backgroundColor: '#ddd',
-    },
-    miniBloque: {
-        width: 20,
-        height: 20,
-        borderRadius: 4,
-        margin: 2,
-    },
-    cantidadTexto: {
-        color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 14,
-    },
+    dropZona: { backgroundColor: '#ddd' },
+    miniBloque: { width: 20, height: 20, borderRadius: 4, margin: 2 },
+    cantidadTexto: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
     progresoWrapper: {
-        width: 96,
-        height: 6,
-        backgroundColor: '#ccc',
-        borderRadius: 3,
-        marginTop: 6,
+        width: 270,
+        height: 8,
+        backgroundColor: '#eee',
+        borderRadius: 4,
+        marginTop: 20, // 🔥 Más abajo de la balanza
         overflow: 'hidden',
     },
     progresoBarra: {
-        height: 6,
+        height: 8,
         backgroundColor: '#3498db',
-        borderRadius: 3,
     },
     pesoTexto: {
         fontSize: 14,
