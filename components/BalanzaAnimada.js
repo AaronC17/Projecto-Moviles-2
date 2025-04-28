@@ -21,6 +21,11 @@ export default function BalanzaAnimada({
     const refIzq = useRef(null);
     const refDer = useRef(null);
 
+    const barraIzq = useRef(new Animated.Value(0)).current;
+    const barraDer = useRef(new Animated.Value(0)).current;
+
+    const pesoMaximo = 200; // Peso máximo para llenar la barra
+
     useEffect(() => {
         const diff = pesoIzq - pesoDer;
         const final = Math.max(Math.min(diff, 50), -50);
@@ -28,6 +33,18 @@ export default function BalanzaAnimada({
             toValue: final,
             duration: 400,
             useNativeDriver: true,
+        }).start();
+
+        Animated.timing(barraIzq, {
+            toValue: Math.min(pesoIzq / pesoMaximo, 1),
+            duration: 500,
+            useNativeDriver: false,
+        }).start();
+
+        Animated.timing(barraDer, {
+            toValue: Math.min(pesoDer / pesoMaximo, 1),
+            duration: 500,
+            useNativeDriver: false,
         }).start();
     }, [pesoIzq, pesoDer]);
 
@@ -48,21 +65,15 @@ export default function BalanzaAnimada({
         setTimeout(medirAreas, 200);
     }, [bloquesIzq.length, bloquesDer.length, medirAreas]);
 
-    // Agrupar bloques por color
     const agruparBloques = (bloques) => {
         const agrupados = {};
-        bloques.forEach(bloque => {
-            if (!agrupados[bloque.color]) {
-                agrupados[bloque.color] = { ...bloque, cantidad: 1 };
-            } else {
-                agrupados[bloque.color].cantidad += 1;
-            }
+        bloques.forEach(b => {
+            agrupados[b.color] = (agrupados[b.color] || 0) + 1;
         });
-        return Object.values(agrupados);
+        return Object.entries(agrupados).map(([color, cantidad]) => ({ color, cantidad }));
     };
 
-    // Render de bloques agrupados
-    const renderBloques = (bloques, lado) => (
+    const renderBloques = (bloques, lado) =>
         agruparBloques(bloques).map((b, idx) => (
             <View
                 key={`${lado}-${b.color}-${idx}`}
@@ -76,9 +87,7 @@ export default function BalanzaAnimada({
                     <Text style={styles.cantidadTexto}>{b.cantidad}</Text>
                 </View>
             </View>
-        ))
-    );
-
+        ));
 
     return (
         <View style={styles.wrapper}>
@@ -115,6 +124,15 @@ export default function BalanzaAnimada({
                         <View style={[styles.platoCaja, styles.dropZona]}>
                             {renderBloques(bloquesIzq, 'izq')}
                         </View>
+                        <View style={styles.progresoWrapper}>
+                            <Animated.View style={[styles.progresoBarra, {
+                                width: barraIzq.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['0%', '100%'],
+                                })
+                            }]} />
+                        </View>
+                        <Text style={styles.pesoTexto}>{pesoIzq} g</Text> {/* 🔥 peso mostrado */}
                     </TouchableOpacity>
 
                     {/* Platillo derecho */}
@@ -128,7 +146,17 @@ export default function BalanzaAnimada({
                         <View style={[styles.platoCaja, styles.dropZona]}>
                             {renderBloques(bloquesDer, 'der')}
                         </View>
+                        <View style={styles.progresoWrapper}>
+                            <Animated.View style={[styles.progresoBarra, {
+                                width: barraDer.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: ['0%', '100%'],
+                                })
+                            }]} />
+                        </View>
+                        <Text style={styles.pesoTexto}>{pesoDer} g</Text> {/* 🔥 peso mostrado */}
                     </TouchableOpacity>
+
                 </Animated.View>
             </View>
         </View>
@@ -147,7 +175,7 @@ const styles = StyleSheet.create({
         color: '#333',
     },
     soporte: {
-        height: 200,
+        height: 240,
         justifyContent: 'flex-start',
         alignItems: 'center',
     },
@@ -189,13 +217,13 @@ const styles = StyleSheet.create({
     platoIzq: {
         position: 'absolute',
         left: 0,
-        bottom: -110,
+        bottom: -130,
         alignItems: 'center',
     },
     platoDer: {
         position: 'absolute',
         right: 0,
-        bottom: -110,
+        bottom: -130,
         alignItems: 'center',
     },
     platoCaja: {
@@ -213,14 +241,33 @@ const styles = StyleSheet.create({
         backgroundColor: '#ddd',
     },
     miniBloque: {
-        width: 24,
-        height: 24,
-        borderRadius: 6,
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        margin: 2,
     },
     cantidadTexto: {
-        color: 'white', // 🔥 Blanco para que resalte
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    progresoWrapper: {
+        width: 96,
+        height: 6,
+        backgroundColor: '#ccc',
+        borderRadius: 3,
+        marginTop: 6,
+        overflow: 'hidden',
+    },
+    progresoBarra: {
+        height: 6,
+        backgroundColor: '#3498db',
+        borderRadius: 3,
+    },
+    pesoTexto: {
         fontSize: 14,
         fontWeight: 'bold',
+        color: '#333',
+        marginTop: 4,
     },
-
 });

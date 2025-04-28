@@ -10,10 +10,10 @@ import {
     Modal,
     TouchableOpacity,
     Animated,
-    Platform,
 } from 'react-native';
 import { getSocket } from '../sockets/connection';
 import BalanzaAnimada from '../components/BalanzaAnimada';
+import { Platform } from 'react-native';
 
 const COLORES = ['red', 'blue', 'green', 'orange', 'purple'];
 
@@ -21,12 +21,12 @@ export default function GameMultijugador() {
     const { nombre } = useLocalSearchParams();
     const router = useRouter();
     const socket = getSocket();
-
     const [bloques, setBloques] = useState([]);
     const [pesoIzq1, setPesoIzq1] = useState(0);
     const [pesoDer1, setPesoDer1] = useState(0);
     const [pesoIzq2, setPesoIzq2] = useState(0);
     const [pesoDer2, setPesoDer2] = useState(0);
+    const [pesosPorColor, setPesosPorColor] = useState({});
     const [bloquesIzq1, setBloquesIzq1] = useState([]);
     const [bloquesDer1, setBloquesDer1] = useState([]);
     const [bloquesIzq2, setBloquesIzq2] = useState([]);
@@ -41,15 +41,13 @@ export default function GameMultijugador() {
     const [mostrarPista, setMostrarPista] = useState(false);
     const [pista, setPista] = useState('');
     const [selectedBlock, setSelectedBlock] = useState(null);
-    const [partidaIniciada, setPartidaIniciada] = useState(false);
     const intervaloRef = useRef(null);
 
     useEffect(() => {
         const nuevos = [];
         COLORES.forEach(color => {
-            const pesoComun = (Math.floor(Math.random() * 10) + 1) * 2;
             for (let i = 0; i < 2; i++) {
-                nuevos.push({ id: `${color}-${i}`, color, peso: pesoComun, pan: new Animated.ValueXY() });
+                nuevos.push({ id: `${color}-${i}`, color, pan: new Animated.ValueXY() });
             }
         });
         setBloques(nuevos);
@@ -57,32 +55,14 @@ export default function GameMultijugador() {
 
     useEffect(() => {
         if (!socket) return;
-
         socket.onmessage = e => {
             const data = JSON.parse(e.data);
             switch (data.type) {
-                case 'ERROR':
-                    if (data.mensaje === "Partida en curso, no se puede ingresar.") {
-                        if (Platform.OS === 'web') {
-                            alert('🚫 La partida ya inició, no puedes ingresar.');
-                        } else {
-                            Alert.alert(
-                                '🚫 Partida en curso',
-                                'La partida ya inició, no puedes ingresar.',
-                                [{ text: 'OK', onPress: () => router.replace('/') }],
-                                { cancelable: false }
-                            );
-                        }
-                        return;
-                    }
-                    break;
                 case 'ENTRADA':
                     setJugadoresConectados(data.totalJugadores || 0);
-                    setPartidaIniciada(data.partidaEnCurso || false);
-                    break;
-
-                case 'PARTIDA_INICIADA':
-                    setPartidaIniciada(true);
+                    if (data.pesosPorColor) {
+                        setPesosPorColor(data.pesosPorColor); // 🔥 CARGAMOS LOS PESOS CORRECTOS
+                    }
                     break;
                 case 'TURNO':
                     setMiTurno(data.tuTurno);
@@ -149,11 +129,9 @@ export default function GameMultijugador() {
                     break;
             }
         };
-
         const msg = JSON.stringify({ type: 'ENTRADA', jugador: nombre, modo: 'multijugador' });
         if (socket.readyState === WebSocket.OPEN) socket.send(msg);
         else socket.onopen = () => socket.send(msg);
-
         return () => clearInterval(intervaloRef.current);
     }, []);
 
@@ -183,8 +161,7 @@ export default function GameMultijugador() {
             JSON.stringify({
                 type: 'JUGADA',
                 jugador: nombre,
-                peso: selectedBlock.peso,
-                color: selectedBlock.color,
+                color: selectedBlock.color, // 🔥 Solo enviar el color
                 lado,
             })
         );
@@ -196,27 +173,29 @@ export default function GameMultijugador() {
 
     const colocarPrueba = lado => {
         if (!selectedBlock) return;
+        const pesoReal = pesosPorColor[selectedBlock.color] || 0;
         if (lado === 'izquierdo') {
-            setPesoIzq2(p => p + selectedBlock.peso);
+            setPesoIzq2(p => p + pesoReal);
             setBloquesIzq2(b => [...b, selectedBlock]);
         } else {
-            setPesoDer2(p => p + selectedBlock.peso);
+            setPesoDer2(p => p + pesoReal);
             setBloquesDer2(b => [...b, selectedBlock]);
         }
         setBloques(b => b.filter(x => x.id !== selectedBlock.id));
         setSelectedBlock(null);
     };
 
+
     const quitarUltimoBloque = lado => {
         let bloque;
         if (lado === 'izquierdo' && bloquesIzq2.length) {
             bloque = bloquesIzq2.pop();
-            setPesoIzq2(p => p - bloque.peso);
+            setPesoIzq2(p => p - (pesosPorColor[bloque.color] || 0));
             setBloques(b => [...b, bloque]);
             setBloquesIzq2([...bloquesIzq2]);
         } else if (lado === 'derecho' && bloquesDer2.length) {
             bloque = bloquesDer2.pop();
-            setPesoDer2(p => p - bloque.peso);
+            setPesoDer2(p => p - (pesosPorColor[bloque.color] || 0));
             setBloques(b => [...b, bloque]);
             setBloquesDer2([...bloquesDer2]);
         } else {
@@ -224,7 +203,8 @@ export default function GameMultijugador() {
         }
     };
 
-    if (!partidaIniciada) {
+
+    if (jugadoresConectados < 10) {
         return (
             <View style={styles.centered}>
                 <Text style={styles.esperando}>Esperando jugadores... ({jugadoresConectados}/10)</Text>

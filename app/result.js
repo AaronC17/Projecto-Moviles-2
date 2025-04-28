@@ -59,16 +59,23 @@ export default function ResultScreen() {
         setEnviando(false);
     };
 
-    const frasesFinales = [
-        '¡Excelente memoria visual!',
-        '¡Nada mal! Podés mejorar aún más.',
-        '¡Qué puntería!',
-        '¡Buena intuición!',
-        '¡Toca practicar más, pero vas bien!',
-    ];
-    const fraseAleatoria = () => {
-        const idx = Math.min(resultadoAciertos, frasesFinales.length - 1);
-        return frasesFinales[idx];
+    const fraseFinal = () => {
+        switch (resultadoAciertos) {
+            case 0:
+                return 'No acertaste ningún bloque, ¡toca practicar más!';
+            case 1:
+                return '¡Toca practicar más, pero vas bien!';
+            case 2:
+                return '¡Nada mal! Podés mejorar aún más.';
+            case 3:
+                return '¡Vas bastante bien!';
+            case 4:
+                return '¡Muy buena intuición!';
+            case 5:
+                return '¡Excelente memoria visual!';
+            default:
+                return '';
+        }
     };
 
     return (
@@ -159,7 +166,7 @@ export default function ResultScreen() {
                         <Text style={styles.aciertos}>
                             🎉 ¡Adivinaste correctamente {resultadoAciertos} de {bloquesUnicos.length} bloques!
                         </Text>
-                        <Text style={styles.frase}>{fraseAleatoria()}</Text>
+                        <Text style={styles.frase}>{fraseFinal()}</Text>
                     </View>
                 )}
 
@@ -314,5 +321,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontStyle: 'italic',
         color: '#444',
+        textAlign: 'center',
     },
 });
