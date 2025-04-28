@@ -52,11 +52,11 @@ export default function BalanzaAnimada({
         setTimeout(medirAreas, 200);
     }, [bloquesIzq.length, bloquesDer.length, medirAreas]);
 
-    // 3) Render de mini-bloques (con key única)
+    // 3) Render de mini-bloques (con key única, usando idx de fallback)
     const renderBloques = (bloques, lado) =>
-        bloques.map(b => (
+        bloques.map((b, idx) => (
             <View
-                key={`${lado}-${b.id}`}         // ← clave compuesta: lado + id
+                key={`${lado}-${b.id ?? idx}`}
                 style={[styles.miniBloque, { backgroundColor: b.color }]}
                 onStartShouldSetResponder={() => true}
                 onResponderLongPress={() => {

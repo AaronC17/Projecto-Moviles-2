@@ -194,20 +194,26 @@ function procesarJugadaMultijugador(ws, msg) {
     clearTimeout(turnoTimeout);
     const peso = pesosPorColor[msg.color];
 
+    // Actualizamos la balanza “oficial”
     if (msg.lado === "izquierdo") pesoIzquierdo += peso;
     else pesoDerecho += peso;
 
     const diff = Math.abs(pesoIzquierdo - pesoDerecho);
 
-    if (diff > 20) {
+    // >>> NUEVO: sólo tras la primera jugada y si diff > 16
+    if (totalJugadas > 0 && diff > 16) {
         ws.eliminado = true;
-        broadcast({ type: "MENSAJE", contenido: `${ws.nombre} fue eliminado por desequilibrar la balanza.` });
+        broadcast({
+            type: "MENSAJE",
+            contenido: `${ws.nombre} fue eliminado por exceder 16 g de diferencia.`,
+        });
         broadcast({
             type: "ACTUALIZAR_BALANZA",
             izquierdo: pesoIzquierdo,
             derecho: pesoDerecho,
             bloque: { id: msg.id, color: msg.color, peso, lado: msg.lado },
         });
+        // comprueba si queda un solo jugador
         if (jugadores.filter(j => !j.eliminado).length === 1) {
             enviarResumenFinal();
             return;
@@ -216,7 +222,14 @@ function procesarJugadaMultijugador(ws, msg) {
         return;
     }
 
-    jugadasMultijugador.push({ turno: totalJugadas + 1, jugador: msg.jugador, id: msg.id, color: msg.color, peso });
+    // si no se elimina, guardamos la jugada
+    jugadasMultijugador.push({
+        turno: totalJugadas + 1,
+        jugador: msg.jugador,
+        id: msg.id,
+        color: msg.color,
+        peso,
+    });
     totalJugadas++;
 
     broadcast({
@@ -225,8 +238,10 @@ function procesarJugadaMultijugador(ws, msg) {
         derecho: pesoDerecho,
         bloque: { id: msg.id, color: msg.color, peso, lado: msg.lado },
     });
-
-    broadcast({ type: "MENSAJE", contenido: `${msg.jugador} colocó ${peso}g en el lado ${msg.lado}` });
+    broadcast({
+        type: "MENSAJE",
+        contenido: `${msg.jugador} colocó ${peso}g en el lado ${msg.lado}.`,
+    });
 
     if (totalJugadas >= bloquesTotales) {
         enviarResumenFinal();
@@ -234,6 +249,7 @@ function procesarJugadaMultijugador(ws, msg) {
         avanzarTurno();
     }
 }
+
 
 function avanzarTurno() {
     if (!jugadores.length) return;
