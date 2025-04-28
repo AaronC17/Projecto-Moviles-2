@@ -29,7 +29,7 @@ export default function BalanzaAnimada({
         Animated.timing(inclinAnim, {
             toValue: final,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: false,
         }).start();
     }, [pesoIzq, pesoDer]);
 

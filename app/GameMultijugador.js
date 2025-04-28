@@ -273,9 +273,7 @@ export default function GameMultijugador() {
                 {bloques.map(renderBloque)}
             </View>
 
-            <View style={styles.finish}>
-                <Button title="Terminar partida" onPress={() => socket.send(JSON.stringify({ type: 'FORZAR_RESUMEN' }))} />
-            </View>
+
         </ScrollView>
     );
 }
