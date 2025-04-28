@@ -262,9 +262,23 @@ export default function GameMultijugador() {
                 </View>
             </Modal>
 
-            <Text style={styles.titulo}>Jugador: {nombre}</Text>
-            <Text style={styles.subtitulo}>Tu compañero: {companero}</Text>
-            <Text style={styles.subtitulo}>Turno de: {jugadorEnTurno}</Text>
+            <View style={styles.header}>
+                <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{nombre.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={styles.info}>
+                    <Text style={styles.playerText}>
+                        Jugador: <Text style={styles.highlight}>{nombre}</Text>
+                    </Text>
+                    <Text style={styles.playerText}>
+                        Compañero: <Text style={styles.highlight}>{companero}</Text>
+                    </Text>
+                    <Text style={styles.playerText}>
+                        Turno de: <Text style={styles.highlight}>{jugadorEnTurno}</Text>
+                    </Text>
+                </View>
+            </View>
+
 
             {miTurno && (
                 <Text style={styles.contador}>
@@ -326,17 +340,13 @@ const styles = StyleSheet.create({
     bloquesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 20 },
     bloque: { width: 60, height: 60, borderRadius: 8, margin: 8 },
     ra: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 },
-    modalBackground: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContainer: {
-        backgroundColor: 'white',
-        padding: 20,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
+    modalBackground: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+    modalContainer: { backgroundColor: 'white', padding: 20, borderRadius: 10, alignItems: 'center' },
     pistaTexto: { fontSize: 18, fontWeight: 'bold', color: '#333', textAlign: 'center' },
+    header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, padding: 10, backgroundColor: '#eef3f8', borderRadius: 8 },
+    avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2c3e50', justifyContent: 'center', alignItems: 'center' },
+    avatarText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+    info: { marginLeft: 10 },
+    playerText: { fontSize: 16, color: '#333' },
+    highlight: { color: '#2c3e50', fontWeight: 'bold' },
 });
