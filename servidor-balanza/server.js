@@ -19,7 +19,7 @@ app.use("/adivinanzas", adivinanzasRoute);
 
 conectarDB();
 
-// ----------------- Variables Globales -----------------
+// Variables globales
 let jugadores = [];
 let turnoActual = 0;
 let pesoIzquierdo = 0;
@@ -31,10 +31,15 @@ let sesionesIndividuales = {};
 let jugadasMultijugador = [];
 let turnoTimeout = null;
 let equipos = {};
+let pesosPorColor = {};  // peso uniforme por color
 
 const COLORES = ["red", "blue", "green", "orange", "purple"];
 
-// ----------------- WebSocket -----------------
+// Generador de IDs
+function generaId(color) {
+    return `${color}-${Math.random().toString(36).substr(2, 5)}-${Date.now()}`;
+}
+
 wss.on("connection", (ws) => {
     ws.id = Math.random().toString(36).substring(2);
     ws.eliminado = false;
@@ -47,12 +52,24 @@ wss.on("connection", (ws) => {
                 ws.nombre = msg.jugador;
                 ws.modo = msg.modo || "multijugador";
 
+                // 1) Generar pesosPorColor una sola vez al arrancar multijugador
+                if (ws.modo === "multijugador" && Object.keys(pesosPorColor).length === 0) {
+                    COLORES.forEach(color => {
+                        pesosPorColor[color] = (Math.floor(Math.random() * 10) + 1) * 2;
+                    });
+                }
+
                 if (ws.modo === "individual") {
+                    // Sesión individual: bloques con ID + peso uniforme
                     if (!sesionesIndividuales[ws.nombre]) {
                         const bloques = [];
-                        COLORES.forEach((color) => {
+                        COLORES.forEach(color => {
                             for (let i = 0; i < 2; i++) {
-                                bloques.push({ color, peso: Math.floor(Math.random() * 10 + 1) * 2 }); // Peso PAR
+                                bloques.push({
+                                    id: generaId(color),
+                                    color,
+                                    peso: pesosPorColor[color]
+                                });
                             }
                         });
                         sesionesIndividuales[ws.nombre] = {
@@ -63,80 +80,55 @@ wss.on("connection", (ws) => {
                             terminado: false,
                         };
                     }
-
                     ws.send(JSON.stringify({
                         type: "TURNO",
                         tuTurno: true,
                         jugadorEnTurno: ws.nombre,
                     }));
-
                 } else {
-                    const yaExiste = jugadores.find(j => j.nombre === msg.jugador);
-                    if (yaExiste) {
+                    // Multijugador
+                    if (jugadores.find(j => j.nombre === msg.jugador)) {
                         ws.send(JSON.stringify({ type: "ERROR", mensaje: "Nombre duplicado" }));
                         ws.close();
                         return;
                     }
-
                     jugadores.push(ws);
 
+                    // Crear bloques del jugador (si no existen), todos con ID únicos
                     if (!bloquesPorJugador[msg.jugador]) {
-                        const bloques = [];
+                        const arr = [];
                         COLORES.forEach(color => {
                             for (let i = 0; i < 2; i++) {
-                                bloques.push({ color, peso: Math.floor(Math.random() * 10 + 1) * 2 }); // Peso PAR
+                                arr.push({
+                                    id: generaId(color),
+                                    color,
+                                    peso: pesosPorColor[color]
+                                });
                                 bloquesTotales++;
                             }
                         });
-                        bloquesPorJugador[msg.jugador] = bloques;
+                        bloquesPorJugador[msg.jugador] = arr;
                     }
+
+                    // Enviar bloques iniciales al cliente
+                    ws.send(JSON.stringify({
+                        type: "BLOQUES",
+                        bloques: bloquesPorJugador[msg.jugador],
+                    }));
 
                     broadcast({ type: "ENTRADA", totalJugadores: jugadores.length });
 
                     if (jugadores.length === 10) {
                         generarEquipos();
-                        const pista = generarPista();
-                        if (pista) {
-                            broadcast({ type: "PISTA", contenido: pista }); // 🟠 la misma pista a TODOS
-                        }
+                        broadcast({ type: "PISTA", contenido: generarPista() });
                         enviarTurno();
                     }
-
-
                 }
             }
-            function generarEquipos() {
-                const nombres = jugadores.map(j => j.nombre);
-                const mezclados = nombres.sort(() => Math.random() - 0.5);
-
-                equipos = {}; // Reiniciar equipos
-
-                for (let i = 0; i < mezclados.length; i += 2) {
-                    const jugador1 = mezclados[i];
-                    const jugador2 = mezclados[i + 1];
-
-                    equipos[jugador1] = jugador2;
-                    equipos[jugador2] = jugador1;
-                }
-
-                // Informar a cada jugador quién es su compañero
-                jugadores.forEach(j => {
-                    if (j.readyState === WebSocket.OPEN) {
-                        j.send(JSON.stringify({
-                            type: "EQUIPO",
-                            compañero: equipos[j.nombre] || null,
-                        }));
-                    }
-                });
-            }
-
 
             if (msg.type === "JUGADA") {
-                if (ws.modo === "individual") {
-                    procesarJugadaIndividual(ws, msg);
-                } else {
-                    procesarJugadaMultijugador(ws, msg);
-                }
+                if (ws.modo === "individual") procesarJugadaIndividual(ws, msg);
+                else procesarJugadaMultijugador(ws, msg);
             }
         } catch (err) {
             console.error("❌ Error:", err.message);
@@ -145,46 +137,39 @@ wss.on("connection", (ws) => {
 
     ws.on("close", () => {
         jugadores = jugadores.filter(j => j !== ws);
-
         broadcast({ type: "ENTRADA", totalJugadores: jugadores.length });
-
         if (turnoActual >= jugadores.length) turnoActual = 0;
         enviarTurno();
     });
 });
 
-// ----------------- Funciones -----------------
-
 function procesarJugadaIndividual(ws, msg) {
     const sesion = sesionesIndividuales[ws.nombre];
     if (!sesion || sesion.terminado) return;
+    const peso = pesosPorColor[msg.color];
 
-    sesion.jugadas.push({ ...msg });
+    sesion.jugadas.push({ ...msg, peso });
 
-    if (msg.lado === "izquierdo") sesion.pesoIzquierdo += msg.peso;
-    else sesion.pesoDerecho += msg.peso;
+    if (msg.lado === "izquierdo") sesion.pesoIzquierdo += peso;
+    else sesion.pesoDerecho += peso;
 
     ws.send(JSON.stringify({
         type: "ACTUALIZAR_BALANZA",
         izquierdo: sesion.pesoIzquierdo,
         derecho: sesion.pesoDerecho,
-        jugador: msg.jugador,
+        bloque: { id: msg.id, color: msg.color, peso, lado: msg.lado },
     }));
 
     if (sesion.jugadas.length >= 10) {
         sesion.terminado = true;
-        const resumen = {
+        ws.send(JSON.stringify({
+            type: "RESUMEN",
             contenido: sesion.jugadas,
-            totales: {
-                izquierdo: sesion.pesoIzquierdo,
-                derecho: sesion.pesoDerecho,
-            },
+            totales: { izquierdo: sesion.pesoIzquierdo, derecho: sesion.pesoDerecho },
             sobrevivientes: [ws.nombre],
             ganador: calcularGanador(sesion.pesoIzquierdo, sesion.pesoDerecho),
             bloquesPorJugador: { [ws.nombre]: sesion.bloques },
-        };
-
-        ws.send(JSON.stringify({ type: "RESUMEN", ...resumen }));
+        }));
     } else {
         ws.send(JSON.stringify({
             type: "TURNO",
@@ -194,72 +179,43 @@ function procesarJugadaIndividual(ws, msg) {
     }
 }
 
-async function procesarJugadaMultijugador(ws, msg) {
+function procesarJugadaMultijugador(ws, msg) {
     clearTimeout(turnoTimeout);
+    const peso = pesosPorColor[msg.color];
 
-    const jugadorActual = jugadores[turnoActual];
-    if (!jugadorActual) return;
+    if (msg.lado === "izquierdo") pesoIzquierdo += peso;
+    else pesoDerecho += peso;
 
-    if (msg.lado === "izquierdo") pesoIzquierdo += msg.peso;
-    else pesoDerecho += msg.peso;
+    const diff = Math.abs(pesoIzquierdo - pesoDerecho);
 
-    const diferencia = Math.abs(pesoIzquierdo - pesoDerecho);
-
-    if (diferencia > 20) {
+    if (diff > 20) {
         ws.eliminado = true;
-
-        broadcast({
-            type: "MENSAJE",
-            contenido: `${ws.nombre} fue eliminado por desequilibrar la balanza.`,
-        });
-
+        broadcast({ type: "MENSAJE", contenido: `${ws.nombre} fue eliminado por desequilibrar la balanza.` });
         broadcast({
             type: "ACTUALIZAR_BALANZA",
             izquierdo: pesoIzquierdo,
             derecho: pesoDerecho,
-            jugador: msg.jugador,
-            bloque: {
-                peso: msg.peso,
-                color: msg.color,
-                lado: msg.lado,
-            },
+            bloque: { id: msg.id, color: msg.color, peso, lado: msg.lado },
         });
-
-        const jugadoresActivos = jugadores.filter(j => !j.eliminado);
-        if (jugadoresActivos.length === 1) {
+        if (jugadores.filter(j => !j.eliminado).length === 1) {
             enviarResumenFinal();
             return;
         }
-
         avanzarTurno();
         return;
     }
 
-    jugadasMultijugador.push({
-        turno: totalJugadas + 1,
-        jugador: msg.jugador,
-        peso: msg.peso,
-        color: msg.color || null,
-    });
+    jugadasMultijugador.push({ turno: totalJugadas + 1, jugador: msg.jugador, id: msg.id, color: msg.color, peso });
+    totalJugadas++;
 
     broadcast({
         type: "ACTUALIZAR_BALANZA",
         izquierdo: pesoIzquierdo,
         derecho: pesoDerecho,
-        jugador: msg.jugador,
-        bloque: {
-            peso: msg.peso,
-            color: msg.color,
-            lado: msg.lado,
-        },
+        bloque: { id: msg.id, color: msg.color, peso, lado: msg.lado },
     });
 
-    broadcast({
-        type: "MENSAJE",
-        contenido: `${msg.jugador} colocó ${msg.peso}g en el lado ${msg.lado}`,
-    });
-
-    totalJugadas++;
+    broadcast({ type: "MENSAJE", contenido: `${msg.jugador} colocó ${peso}g en el lado ${msg.lado}` });
 
     if (totalJugadas >= bloquesTotales) {
         enviarResumenFinal();
@@ -269,44 +225,30 @@ async function procesarJugadaMultijugador(ws, msg) {
 }
 
 function avanzarTurno() {
-    if (jugadores.length === 0) return;
-
+    if (!jugadores.length) return;
     do {
         turnoActual = (turnoActual + 1) % jugadores.length;
-    } while (jugadores[turnoActual]?.eliminado);
-
+    } while (jugadores[turnoActual].eliminado);
     enviarTurno();
 }
 
 function enviarTurno() {
     clearTimeout(turnoTimeout);
-
-    if (!jugadores.length || turnoActual >= jugadores.length) return;
-
-    const jugadorActual = jugadores[turnoActual];
-    if (!jugadorActual) return;
-
+    const actual = jugadores[turnoActual];
     jugadores.forEach((j, i) => {
         if (j.readyState === WebSocket.OPEN) {
             j.send(JSON.stringify({
                 type: "TURNO",
                 tuTurno: i === turnoActual && !j.eliminado,
-                jugadorEnTurno: jugadorActual.nombre,
+                jugadorEnTurno: actual.nombre,
             }));
         }
     });
-
     turnoTimeout = setTimeout(() => {
-        if (jugadores[turnoActual]) {
-            jugadores[turnoActual].eliminado = true;
-            broadcast({
-                type: "MENSAJE",
-                contenido: `${jugadores[turnoActual].nombre} fue eliminado por inactividad.`,
-            });
-            avanzarTurno();
-        }
-    }, 300000); // 300 segundos (5 minutos)
-
+        jugadores[turnoActual].eliminado = true;
+        broadcast({ type: "MENSAJE", contenido: `${jugadores[turnoActual].nombre} fue eliminado por inactividad.` });
+        avanzarTurno();
+    }, 300000);
 }
 
 function calcularGanador(izq, der) {
@@ -314,31 +256,48 @@ function calcularGanador(izq, der) {
     return izq < der ? "Izquierdo" : "Derecho";
 }
 
-function broadcast(data) {
-    const mensaje = JSON.stringify(data);
-    jugadores.forEach((j) => {
+function generarEquipos() {
+    const mezclados = [...jugadores.map(j => j.nombre)].sort(() => Math.random() - 0.5);
+    equipos = {};
+    for (let i = 0; i < mezclados.length; i += 2) {
+        const a = mezclados[i], b = mezclados[i + 1];
+        equipos[a] = b;
+        equipos[b] = a;
+    }
+    jugadores.forEach(j => {
         if (j.readyState === WebSocket.OPEN) {
-            j.send(mensaje);
+            j.send(JSON.stringify({ type: "EQUIPO", compañero: equipos[j.nombre] }));
         }
     });
 }
 
-function enviarResumenFinal() {
-    const sobrevivientes = jugadores.filter(j => !j.eliminado).map(j => j.nombre || "Jugador");
+function generarPista() {
+    const traducciones = { red: "rojo", blue: "azul", green: "verde", orange: "naranja", purple: "morado" };
+    const colores = Object.keys(pesosPorColor);
+    const idx = Math.floor(Math.random() * colores.length);
+    const color = colores[idx];
+    const peso = pesosPorColor[color];
+    return `🔎 Pista: El bloque ${traducciones[color]} pesa ${peso} gramos.`;
+}
 
+function broadcast(data) {
+    const msg = JSON.stringify(data);
+    jugadores.forEach(j => {
+        if (j.readyState === WebSocket.OPEN) j.send(msg);
+    });
+}
+
+function enviarResumenFinal() {
+    const sobrevivientes = jugadores.filter(j => !j.eliminado).map(j => j.nombre);
     broadcast({
         type: "RESUMEN",
         contenido: jugadasMultijugador,
-        totales: {
-            izquierdo: pesoIzquierdo,
-            derecho: pesoDerecho,
-        },
+        totales: { izquierdo: pesoIzquierdo, derecho: pesoDerecho },
         sobrevivientes,
         ganador: calcularGanador(pesoIzquierdo, pesoDerecho),
         bloquesPorJugador,
     });
-
-    jugadores.forEach(j => j.eliminado = false);
+    // reset
     jugadores = [];
     turnoActual = 0;
     pesoIzquierdo = 0;
@@ -348,38 +307,9 @@ function enviarResumenFinal() {
     bloquesPorJugador = {};
     jugadasMultijugador = [];
     equipos = {};
+    pesosPorColor = {};
 }
 
-function generarPista() {
-    const todosLosBloques = [];
-
-    Object.keys(bloquesPorJugador).forEach(nombre => {
-        todosLosBloques.push(...bloquesPorJugador[nombre]);
-    });
-
-    if (todosLosBloques.length === 0) return null;
-
-    const bloquesOrdenados = [...todosLosBloques].sort((a, b) => a.peso - b.peso);
-    const indice = Math.floor(Math.random() * Math.min(5, bloquesOrdenados.length));
-    const bloquePista = bloquesOrdenados[indice];
-
-    const posiciones = ["el más liviano", "el segundo más liviano", "el tercer más liviano", "el cuarto más liviano", "el quinto más liviano"];
-
-    return `🔎 Pista: El bloque ${traducirColor(bloquePista.color)} es ${posiciones[indice]} y pesa ${bloquePista.peso} gramos.`;
-}
-
-function traducirColor(colorIngles) {
-    const traducciones = {
-        red: "rojo",
-        blue: "azul",
-        green: "verde",
-        orange: "naranja",
-        purple: "morado",
-    };
-    return traducciones[colorIngles] || colorIngles;
-}
-
-// ----------------- Server Start -----------------
 const PORT = 5000;
 server.listen(PORT, () => {
     console.log(`🚀 Servidor activo en http://localhost:${PORT}`);
