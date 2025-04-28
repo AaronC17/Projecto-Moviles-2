@@ -27,7 +27,6 @@ export default function ResultScreen() {
     const [resultadoAciertos, setResultadoAciertos] = useState(null);
     const [enviando, setEnviando] = useState(false);
 
-    // Filtrar bloques únicos por color
     const bloquesUnicos = [];
     const coloresVistos = new Set();
     misBloques.forEach((bloque) => {
@@ -119,11 +118,7 @@ export default function ResultScreen() {
                             return (
                                 <View key={i} style={styles.bloqueBox}>
                                     <Text>Bloque {i + 1} (color {traducirColor(bloque.color)}):</Text>
-                                    <ScrollView
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        contentContainerStyle={styles.selectorRow}
-                                    >
+                                    <View style={styles.selectorRow}>
                                         {[...Array(10)].map((_, n) => {
                                             const valor = (n + 1) * 2;
                                             const seleccionado = adivinanzas[i] === valor;
@@ -147,7 +142,7 @@ export default function ResultScreen() {
                                                 </TouchableOpacity>
                                             );
                                         })}
-                                    </ScrollView>
+                                    </View>
                                 </View>
                             );
                         })}
@@ -174,6 +169,7 @@ export default function ResultScreen() {
                 >
                     <Text style={styles.botonTexto}>🔄 Volver al inicio</Text>
                 </TouchableOpacity>
+
             </View>
         </ScrollView>
     );
@@ -185,22 +181,25 @@ const styles = StyleSheet.create({
         backgroundColor: '#f7fafd',
     },
     contentContainer: {
+        flexGrow: 1,
         alignItems: 'center',
         paddingVertical: 20,
+        paddingHorizontal: 16,
     },
     innerContainer: {
         width: '100%',
+        maxWidth: 400,
         alignSelf: 'center',
     },
     statsGrid: {
         flexDirection: 'row',
-        width: '100%',                  // Ocupan todo el ancho disponible
-        justifyContent: 'space-between',// Reparten uniformemente el espacio
+        width: '100%',
+        justifyContent: 'space-between',
         alignItems: 'center',
         marginVertical: 16,
     },
     statCard: {
-        flex: 1,                        // Cada tarjeta crece para llenar el espacio
+        flex: 1,
         backgroundColor: '#fff',
         borderRadius: 8,
         padding: 16,
@@ -211,7 +210,7 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     survivorsContainer: {
-        width: '100%',                  // También abarca todo el ancho
+        width: '100%',
         backgroundColor: '#fff',
         borderRadius: 8,
         padding: 16,
@@ -265,6 +264,8 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     selectorRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
         justifyContent: 'center',
         width: '100%',
     },
@@ -291,6 +292,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         alignItems: 'center',
         width: '100%',
+        maxWidth: 400,
         marginTop: 20,
     },
     botonTexto: {
