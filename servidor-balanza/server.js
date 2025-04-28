@@ -63,13 +63,13 @@ wss.on("connection", (ws) => {
                     return;
                 }
 
-                // 🔥 Solo una vez, crear pesosPorColor si no existe
-                if (Object.keys(pesosPorColor).length === 0) {
+                if (ws.modo === "multijugador" && !partidaEnCurso && Object.keys(pesosPorColor).length === 0) {
                     COLORES.forEach(color => {
                         pesosPorColor[color] = (Math.floor(Math.random() * 10) + 1) * 2;
                     });
-                    console.log("🎯 Pesos generados por color:", pesosPorColor);
+                    console.log("Pesos generados por color:", pesosPorColor);
                 }
+
 
                 if (ws.modo === "individual") {
                     if (!sesionesIndividuales[ws.nombre]) {
@@ -354,7 +354,7 @@ function enviarResumenFinal() {
     bloquesPorJugador = {};
     jugadasMultijugador = [];
     equipos = {};
-    pesosPorColor = {}; // 🔥🔥🔥 AGREGA ESTA LÍNEA
+    pesosPorColor = {};
     partidaEnCurso = false;
 }
 
