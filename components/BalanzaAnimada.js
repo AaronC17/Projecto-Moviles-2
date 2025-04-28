@@ -1,5 +1,11 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { View, Text, Animated, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+    View,
+    Text,
+    Animated,
+    StyleSheet,
+    TouchableOpacity,
+} from 'react-native';
 
 export default function BalanzaAnimada({
     pesoIzq,
@@ -14,9 +20,8 @@ export default function BalanzaAnimada({
     const inclinAnim = useRef(new Animated.Value(0)).current;
     const refIzq = useRef(null);
     const refDer = useRef(null);
-    const barraDiff = useRef(new Animated.Value(0)).current;
 
-    const diferenciaMaxima = 16; // 🔥 máximo permitido de diferencia
+    const pesoMaximo = 16; // 🔥 Diferencia máxima peligrosa
 
     useEffect(() => {
         const diff = pesoIzq - pesoDer;
@@ -25,13 +30,6 @@ export default function BalanzaAnimada({
             toValue: final,
             duration: 400,
             useNativeDriver: true,
-        }).start();
-
-        const diferencia = Math.min(Math.abs(pesoIzq - pesoDer) / diferenciaMaxima, 1);
-        Animated.timing(barraDiff, {
-            toValue: diferencia,
-            duration: 300, // 🔥 Más rápido
-            useNativeDriver: false,
         }).start();
     }, [pesoIzq, pesoDer]);
 
@@ -82,10 +80,9 @@ export default function BalanzaAnimada({
             <View style={styles.soporte}>
                 <View style={styles.baseVertical} />
 
-                {/* TODO inclinado */}
                 <Animated.View
                     style={[
-                        styles.barraYbarraInferior,
+                        styles.barra,
                         {
                             transform: [
                                 {
@@ -98,65 +95,89 @@ export default function BalanzaAnimada({
                         },
                     ]}
                 >
-                    <View style={styles.barra}>
-                        <View style={styles.cuerdaIzq} />
-                        <View style={styles.cuerdaDer} />
+                    <View style={styles.cuerdaIzq} />
+                    <View style={styles.cuerdaDer} />
 
-                        {/* Platillo izquierdo */}
-                        <TouchableOpacity
-                            ref={refIzq}
-                            onLayout={medirAreas}
-                            onPress={() => onPlace && onPlace('izquierdo')}
-                            activeOpacity={0.6}
-                            style={styles.platoIzq}
-                        >
-                            <View style={[styles.platoCaja, styles.dropZona]}>
-                                {renderBloques(bloquesIzq, 'izq')}
-                            </View>
-                            <Text style={styles.pesoTexto}>{pesoIzq} g</Text>
-                        </TouchableOpacity>
+                    {/* Platillo izquierdo */}
+                    <TouchableOpacity
+                        ref={refIzq}
+                        onLayout={medirAreas}
+                        onPress={() => onPlace && onPlace('izquierdo')}
+                        activeOpacity={0.6}
+                        style={styles.platoIzq}
+                    >
+                        <View style={[styles.platoCaja, styles.dropZona]}>
+                            {renderBloques(bloquesIzq, 'izq')}
+                        </View>
+                        <Text style={styles.pesoTexto}>{pesoIzq} g</Text>
+                    </TouchableOpacity>
 
-                        {/* Platillo derecho */}
-                        <TouchableOpacity
-                            ref={refDer}
-                            onLayout={medirAreas}
-                            onPress={() => onPlace && onPlace('derecho')}
-                            activeOpacity={0.6}
-                            style={styles.platoDer}
-                        >
-                            <View style={[styles.platoCaja, styles.dropZona]}>
-                                {renderBloques(bloquesDer, 'der')}
-                            </View>
-                            <Text style={styles.pesoTexto}>{pesoDer} g</Text>
-                        </TouchableOpacity>
-                    </View>
+                    {/* Platillo derecho */}
+                    <TouchableOpacity
+                        ref={refDer}
+                        onLayout={medirAreas}
+                        onPress={() => onPlace && onPlace('derecho')}
+                        activeOpacity={0.6}
+                        style={styles.platoDer}
+                    >
+                        <View style={[styles.platoCaja, styles.dropZona]}>
+                            {renderBloques(bloquesDer, 'der')}
+                        </View>
+                        <Text style={styles.pesoTexto}>{pesoDer} g</Text>
+                    </TouchableOpacity>
+                </Animated.View>
 
-                    {/* 🔥 Barra diferencia ABAJO */}
-                    <View style={styles.progresoWrapper}>
-                        <Animated.View
-                            style={[
-                                styles.progresoBarra,
+                {/* Barra de diferencia abajo e inclinada */}
+                <Animated.View
+                    style={[
+                        styles.barraDiferencia,
+                        {
+                            transform: [
                                 {
-                                    width: barraDiff.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: ['0%', '100%'],
+                                    rotate: inclinAnim.interpolate({
+                                        inputRange: [-50, 0, 50],
+                                        outputRange: ['10deg', '0deg', '-10deg'],
                                     }),
                                 },
-                            ]}
-                        />
-                    </View>
-                </Animated.View>
+                            ],
+                            backgroundColor: inclinAnim.interpolate({
+                                inputRange: [-pesoMaximo, -pesoMaximo / 2, 0, pesoMaximo / 2, pesoMaximo],
+                                outputRange: ['red', 'yellow', 'lightblue', 'yellow', 'red'],
+                            }),
+                            width: inclinAnim.interpolate({
+                                inputRange: [-pesoMaximo, 0, pesoMaximo],
+                                outputRange: ['100%', '0%', '100%'],
+                            }),
+                        },
+                    ]}
+                />
             </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    wrapper: { alignItems: 'center', marginTop: 30 },
-    titulo: { marginBottom: 10, fontSize: 18, fontWeight: 'bold', color: '#333' },
-    soporte: { height: 300, justifyContent: 'flex-start', alignItems: 'center' },
-    baseVertical: { width: 8, height: 70, backgroundColor: '#666', borderRadius: 4 },
-    barraYbarraInferior: { alignItems: 'center' },
+    wrapper: {
+        alignItems: 'center',
+        marginTop: 30,
+    },
+    titulo: {
+        marginBottom: 10,
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+    },
+    soporte: {
+        height: 240,
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+    },
+    baseVertical: {
+        width: 8,
+        height: 70,
+        backgroundColor: '#666',
+        borderRadius: 4,
+    },
     barra: {
         width: 270,
         height: 15,
@@ -170,40 +191,71 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 4,
     },
-    cuerdaIzq: { position: 'absolute', left: 46, bottom: -14, width: 2, height: 15, backgroundColor: '#2c3e50' },
-    cuerdaDer: { position: 'absolute', right: 48, bottom: -14, width: 2, height: 15, backgroundColor: '#2c3e50' },
-    platoIzq: { position: 'absolute', left: 0, bottom: -130, alignItems: 'center' },
-    platoDer: { position: 'absolute', right: 0, bottom: -130, alignItems: 'center' },
+    cuerdaIzq: {
+        position: 'absolute',
+        left: 46,
+        bottom: -14,
+        width: 2,
+        height: 15,
+        backgroundColor: '#2c3e50',
+    },
+    cuerdaDer: {
+        position: 'absolute',
+        right: 48,
+        bottom: -14,
+        width: 2,
+        height: 15,
+        backgroundColor: '#2c3e50',
+    },
+    platoIzq: {
+        position: 'absolute',
+        left: 0,
+        bottom: -110,
+        alignItems: 'center',
+    },
+    platoDer: {
+        position: 'absolute',
+        right: 0,
+        bottom: -110,
+        alignItems: 'center',
+    },
     platoCaja: {
         width: 96,
         height: 96,
         borderRadius: 10,
-        padding: 4,
+        padding: 2,
         flexWrap: 'wrap',
         flexDirection: 'row',
         alignItems: 'flex-start',
         borderWidth: 1,
         borderColor: '#ccc',
     },
-    dropZona: { backgroundColor: '#ddd' },
-    miniBloque: { width: 20, height: 20, borderRadius: 4, margin: 2 },
-    cantidadTexto: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-    progresoWrapper: {
-        width: 270,
-        height: 8,
-        backgroundColor: '#eee',
-        borderRadius: 4,
-        marginTop: 20, // 🔥 Más abajo de la balanza
-        overflow: 'hidden',
+    dropZona: {
+        backgroundColor: '#ddd',
     },
-    progresoBarra: {
-        height: 8,
-        backgroundColor: '#3498db',
+    miniBloque: {
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        margin: 2,
+    },
+    cantidadTexto: {
+        color: '#fff',
+        fontWeight: 'bold',
+        fontSize: 14,
     },
     pesoTexto: {
         fontSize: 14,
         fontWeight: 'bold',
-        color: '#333',
+        color: 'black',
         marginTop: 4,
+        fontSize: 0.1
+    },
+    barraDiferencia: {
+        position: 'absolute',
+        bottom: 25, // 🔥 Barra más abajo de todo
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: 'lightblue',
     },
 });

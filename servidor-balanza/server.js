@@ -149,11 +149,27 @@ wss.on("connection", (ws) => {
     });
 
     ws.on("close", () => {
-        jugadores = jugadores.filter(j => j !== ws);
-        broadcast({ type: "ENTRADA", totalJugadores: jugadores.length, pesosPorColor }); // 🔥 AÑADIDO
-        if (turnoActual >= jugadores.length) turnoActual = 0;
-        enviarTurno();
+        if (ws.modo === "multijugador") {
+            jugadores = jugadores.filter(j => j !== ws);
+            if (!partidaEnCurso) {
+                broadcast({ type: "ENTRADA", totalJugadores: jugadores.length, pesosPorColor });
+            } else {
+                const vivos = jugadores.filter(j => !j.eliminado);
+                if (vivos.length === 0) {
+                    resetearServidor();
+                } else if (turnoActual >= jugadores.length) {
+                    turnoActual = 0;
+                    avanzarTurno();
+                } else {
+                    avanzarTurno();
+                }
+            }
+        }
     });
+
+
+
+
 
 });
 
@@ -383,6 +399,20 @@ function enviarResumenFinal() {
     partidaEnCurso = false;
 }
 
+function resetearServidor() {
+    jugadores = [];
+    turnoActual = 0;
+    pesoIzquierdo = 0;
+    pesoDerecho = 0;
+    totalJugadas = 0;
+    bloquesTotales = 0;
+    bloquesPorJugador = {};
+    jugadasMultijugador = [];
+    equipos = {};
+    pesosPorColor = {};
+    partidaEnCurso = false;
+    console.log("🔄 Servidor reseteado: esperando nueva partida.");
+}
 
 const PORT = 5000;
 server.listen(PORT, () => {

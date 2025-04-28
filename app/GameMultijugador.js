@@ -41,6 +41,7 @@ export default function GameMultijugador() {
     const [mostrarPista, setMostrarPista] = useState(false);
     const [pista, setPista] = useState('');
     const [selectedBlock, setSelectedBlock] = useState(null);
+    const [esperandoInicio, setEsperandoInicio] = useState(true);
     const intervaloRef = useRef(null);
 
     useEffect(() => {
@@ -61,7 +62,12 @@ export default function GameMultijugador() {
                 case 'ENTRADA':
                     setJugadoresConectados(data.totalJugadores || 0);
                     if (data.pesosPorColor) {
-                        setPesosPorColor(data.pesosPorColor); // 🔥 CARGAMOS LOS PESOS CORRECTOS
+                        setPesosPorColor(data.pesosPorColor);
+                    }
+                    if (data.totalJugadores === 10) {
+                        setEsperandoInicio(false);
+                    } else {
+                        setEsperandoInicio(true);
                     }
                     break;
                 case 'TURNO':
@@ -161,7 +167,7 @@ export default function GameMultijugador() {
             JSON.stringify({
                 type: 'JUGADA',
                 jugador: nombre,
-                color: selectedBlock.color, // 🔥 Solo enviar el color
+                color: selectedBlock.color,
                 lado,
             })
         );
@@ -185,7 +191,6 @@ export default function GameMultijugador() {
         setSelectedBlock(null);
     };
 
-
     const quitarUltimoBloque = lado => {
         let bloque;
         if (lado === 'izquierdo' && bloquesIzq2.length) {
@@ -203,8 +208,7 @@ export default function GameMultijugador() {
         }
     };
 
-
-    if (jugadoresConectados < 10) {
+    if (esperandoInicio) {
         return (
             <View style={styles.centered}>
                 <Text style={styles.esperando}>Esperando jugadores... ({jugadoresConectados}/10)</Text>
